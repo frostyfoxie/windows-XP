@@ -1,11 +1,13 @@
 /**
  * MSN Messenger '05 Encrypted ChitChat Enclave Module
  * Cryptographically secured with PBKDF2 (100k SHA-256 iterations) + AES-256-GCM.
- * Fully features:
- *  - Buddies sidepanel with real-time member listing and presence
- *  - Nudge button strictly enabled in DMs (disabled in groups) with multi-user window shaking
- *  - Chunked file/photo transmission avoiding call-stack limits
- *  - Emoticons & Wink magic animations
+ * Features:
+ *  - Full two-way realtime DMs with automatic inbox discovery
+ *  - Block/Unblock buddy in DMs with cloud-persisted blocklist
+ *  - Delete DM conversation and clear conversation history
+ *  - Exit from Group with presence unregistration
+ *  - Chunked safe file/image encryption (no call-stack limits)
+ *  - Nudge button strictly enabled in DMs with audio & window-shake
  */
 window.MSNMessenger = (function () {
   let db = null;
@@ -17,12 +19,14 @@ window.MSNMessenger = (function () {
 
   let activeGroupId = null;
   let activeDMId = null;
+  let activeBuddyId = null;
   let currentEncryptionKey = null;
   let participantsVisible = true;
 
   const joinedGroups = new Set();
   const groupPasswords = {};
   const startedDMs = new Set();
+  const blockedUsers = new Set();
 
   function init(firebaseDatabase, userState) {
     db = firebaseDatabase;
@@ -35,10 +39,12 @@ window.MSNMessenger = (function () {
     if (userState.joinedGroups) userState.joinedGroups.forEach(g => joinedGroups.add(g));
     if (userState.groupPasswords) Object.assign(groupPasswords, userState.groupPasswords);
     if (userState.startedDMs) userState.startedDMs.forEach(d => startedDMs.add(d));
+    if (userState.blockedUsers) userState.blockedUsers.forEach(b => blockedUsers.add(b));
 
     updateNudgeVisibility();
     renderSidebarItems();
     updateUI();
+    listenInboxDMs();
   }
 
   function sanitizePath(id) {
@@ -113,14 +119,35 @@ window.MSNMessenger = (function () {
     );
   }
 
-  // Dynamic Nudge: Full color and operational in DMs, disabled with tooltip in groups
+  // Realtime Inbox Listener
+  function listenInboxDMs() {
+    if (!db || !userId) return;
+    db.ref(`users/${userId}/dms`).on('child_added', snap => {
+      const buddyId = snap.key;
+      if (buddyId && buddyId !== userId) {
+        startedDMs.add(buddyId);
+        addDMToList(buddyId);
+        persistState();
+      }
+    });
+
+    db.ref(`users/${userId}/dms`).on('child_removed', snap => {
+      const buddyId = snap.key;
+      startedDMs.delete(buddyId);
+      const item = document.querySelector(`#dmList .group-item[data-id="${buddyId}"]`);
+      if (item) item.remove();
+      persistState();
+    });
+  }
+
   function updateNudgeVisibility() {
     const nudgeBtn = document.getElementById('msnNudgeBtn');
     if (!nudgeBtn) return;
     if (activeDMId) {
-      nudgeBtn.style.opacity = '1';
-      nudgeBtn.style.cursor = 'pointer';
-      nudgeBtn.title = 'Send MSN Nudge (Shakes Buddy Screen)';
+      const isBlocked = activeBuddyId && blockedUsers.has(activeBuddyId);
+      nudgeBtn.style.opacity = isBlocked ? '0.4' : '1';
+      nudgeBtn.style.cursor = isBlocked ? 'not-allowed' : 'pointer';
+      nudgeBtn.title = isBlocked ? 'Cannot nudge a blocked buddy' : 'Send MSN Nudge (Shakes Buddy Screen)';
     } else {
       nudgeBtn.style.opacity = '0.4';
       nudgeBtn.style.cursor = 'not-allowed';
@@ -128,6 +155,51 @@ window.MSNMessenger = (function () {
     }
   }
 
+  function updateHeaderControls() {
+    const exitBtn = document.getElementById('exitGroupBtn');
+    const blockBtn = document.getElementById('blockBuddyBtn');
+    const deleteBtn = document.getElementById('deleteDmBtn');
+    const input = document.getElementById('messageText');
+
+    if (activeGroupId) {
+      if (exitBtn) exitBtn.style.display = 'inline-flex';
+      if (blockBtn) blockBtn.style.display = 'none';
+      if (deleteBtn) deleteBtn.style.display = 'none';
+      if (input) {
+        input.disabled = false;
+        input.placeholder = "Type a message in #" + activeGroupId + "...";
+      }
+    } else if (activeDMId && activeBuddyId) {
+      if (exitBtn) exitBtn.style.display = 'none';
+      if (blockBtn) {
+        blockBtn.style.display = 'inline-flex';
+        const isBlocked = blockedUsers.has(activeBuddyId);
+        blockBtn.innerHTML = isBlocked
+          ? '<i class="fas fa-check-circle" style="color:#39b54a;"></i> Unblock'
+          : '<i class="fas fa-ban" style="color:#c22f0e;"></i> Block';
+        blockBtn.title = isBlocked ? "Unblock this buddy" : "Block this buddy";
+      }
+      if (deleteBtn) deleteBtn.style.display = 'inline-flex';
+
+      const isBlocked = blockedUsers.has(activeBuddyId);
+      if (input) {
+        input.disabled = isBlocked;
+        input.placeholder = isBlocked
+          ? "[Blocked] You have blocked this buddy. Click Unblock to chat."
+          : "Type a direct message to " + activeBuddyId + "...";
+      }
+    } else {
+      if (exitBtn) exitBtn.style.display = 'none';
+      if (blockBtn) blockBtn.style.display = 'none';
+      if (deleteBtn) deleteBtn.style.display = 'none';
+      if (input) {
+        input.disabled = true;
+        input.placeholder = "Select or join a conversation first...";
+      }
+    }
+  }
+
+  // Group Operations
   async function joinGroup() {
     const rawGid = document.getElementById('groupIdInput').value.trim();
     const pwd = document.getElementById('groupPasswordInput').value;
@@ -140,8 +212,11 @@ window.MSNMessenger = (function () {
     const gid = sanitizePath(rawGid);
 
     try {
+      detachActiveChatListeners();
+
       activeGroupId = gid;
       activeDMId = null;
+      activeBuddyId = null;
       currentEncryptionKey = await deriveKey(pwd, gid);
 
       joinedGroups.add(gid);
@@ -154,7 +229,7 @@ window.MSNMessenger = (function () {
           avatar: userAvatar,
           status: userStatus,
           lastSeen: Date.now()
-        }).catch(e => console.warn("Firebase group user sync warning:", e));
+        }).catch(e => console.warn("Firebase presence sync error:", e));
       }
 
       updateChatHeader(`Group: #${gid}`, gid[0].toUpperCase(), true);
@@ -162,6 +237,7 @@ window.MSNMessenger = (function () {
       listenGroupMessages();
       loadGroupParticipants();
       updateNudgeVisibility();
+      updateHeaderControls();
 
       document.getElementById('groupIdInput').value = '';
       document.getElementById('groupPasswordInput').value = '';
@@ -169,6 +245,27 @@ window.MSNMessenger = (function () {
       console.error(err);
       alert("Encryption key derivation error: " + err.message);
     }
+  }
+
+  function exitGroup() {
+    if (!activeGroupId) return;
+    const gid = activeGroupId;
+    if (!confirm(`Are you sure you want to leave #${gid}?`)) return;
+
+    if (db) {
+      db.ref(`groups/${gid}/users/${userId}`).remove().catch(e => console.warn(e));
+      db.ref(`groups/${gid}/messages`).off();
+      db.ref(`groups/${gid}/users`).off();
+    }
+
+    joinedGroups.delete(gid);
+    delete groupPasswords[gid];
+
+    const groupEl = document.querySelector(`#groupList .group-item[data-id="${gid}"]`);
+    if (groupEl) groupEl.remove();
+
+    persistState();
+    resetToWelcomeScreen();
   }
 
   function addGroupToList(gid) {
@@ -191,11 +288,14 @@ window.MSNMessenger = (function () {
         groupPasswords[gid] = pwd;
         persistState();
       }
+      detachActiveChatListeners();
       activeGroupId = gid;
       activeDMId = null;
+      activeBuddyId = null;
       currentEncryptionKey = await deriveKey(pwd, gid);
       updateChatHeader(`Group: #${gid}`, gid[0].toUpperCase(), true);
       updateNudgeVisibility();
+      updateHeaderControls();
       listenGroupMessages();
       loadGroupParticipants();
     };
@@ -203,18 +303,18 @@ window.MSNMessenger = (function () {
   }
 
   function listenGroupMessages() {
-    if (!activeGroupId) return;
+    if (!activeGroupId || !db) return;
     const chatArea = document.getElementById('chatArea');
     chatArea.innerHTML = '<div style="font-size: 11px; color: #555; padding: 10px;"><i class="fas fa-spinner fa-spin"></i> Establishing secure E2EE channel...</div>';
 
-    if (!db) return;
     const ref = db.ref(`groups/${activeGroupId}/messages`);
     ref.off();
     ref.on('child_added', snap => appendMessage(snap.val(), true));
   }
 
-  function startDM() {
-    const rawOtherId = document.getElementById('dmUserInput').value.trim();
+  // Direct Messaging
+  function startDM(targetBuddyId) {
+    const rawOtherId = targetBuddyId || document.getElementById('dmUserInput').value.trim();
     if (!rawOtherId) return;
     const otherId = sanitizePath(rawOtherId);
 
@@ -223,6 +323,9 @@ window.MSNMessenger = (function () {
       return;
     }
 
+    detachActiveChatListeners();
+
+    activeBuddyId = otherId;
     activeDMId = [userId, otherId].sort().join('_');
     activeGroupId = null;
     currentEncryptionKey = null;
@@ -230,29 +333,44 @@ window.MSNMessenger = (function () {
     startedDMs.add(otherId);
     persistState();
 
+    if (db) {
+      db.ref(`users/${userId}/dms/${otherId}`).update({
+        buddyId: otherId,
+        lastUpdated: Date.now()
+      }).catch(e => console.warn(e));
+
+      db.ref(`users/${otherId}/dms/${userId}`).update({
+        buddyId: userId,
+        senderUsername: username,
+        lastUpdated: Date.now()
+      }).catch(e => console.warn(e));
+    }
+
     updateChatHeader(`Buddy: ${otherId}`, otherId[0].toUpperCase(), false);
     addDMToList(otherId);
     updateNudgeVisibility();
+    updateHeaderControls();
     listenDMMessages();
 
-    // Populate Participants with the buddy
     const listEl = document.getElementById('participantsList');
     if (listEl) {
+      const isBlocked = blockedUsers.has(otherId);
       listEl.innerHTML = `
         <div class="participant-item">
           <div class="participant-avatar"><i class="fas fa-user"></i></div>
-          <div style="flex:1;"><b>${escapeHtml(otherId)}</b> (Buddy)</div>
+          <div style="flex:1; overflow:hidden; text-overflow:ellipsis;"><b>${escapeHtml(otherId)}</b> ${isBlocked ? '<span style="color:red;">[Blocked]</span>' : '(Buddy)'}</div>
         </div>
         <div class="participant-item">
           <div class="participant-avatar"><i class="fas fa-user-circle"></i></div>
-          <div style="flex:1;"><b>${escapeHtml(username)}</b> (You)</div>
+          <div style="flex:1; overflow:hidden; text-overflow:ellipsis;"><b>${escapeHtml(username)}</b> (You)</div>
         </div>
       `;
       const countEl = document.getElementById('buddyCount');
       if (countEl) countEl.innerText = '2';
     }
 
-    document.getElementById('dmUserInput').value = '';
+    const input = document.getElementById('dmUserInput');
+    if (input) input.value = '';
   }
 
   function addDMToList(otherId) {
@@ -262,19 +380,14 @@ window.MSNMessenger = (function () {
     const div = document.createElement('div');
     div.className = 'group-item';
     div.setAttribute('data-id', otherId);
+    const isBlocked = blockedUsers.has(otherId);
+
     div.innerHTML = `
       <div class="group-item-avatar">${otherId[0].toUpperCase()}</div>
       <div style="flex: 1; font-weight: bold; overflow: hidden; text-overflow: ellipsis;">${otherId}</div>
-      <i class="far fa-comment-dots" style="font-size: 10px; color: #ff9900;"></i>
+      <i class="${isBlocked ? 'fas fa-ban' : 'far fa-comment-dots'}" style="font-size: 10px; color: ${isBlocked ? '#c00' : '#ff9900'};"></i>
     `;
-    div.onclick = () => {
-      activeDMId = [userId, otherId].sort().join('_');
-      activeGroupId = null;
-      currentEncryptionKey = null;
-      updateChatHeader(`Buddy: ${otherId}`, otherId[0].toUpperCase(), false);
-      updateNudgeVisibility();
-      listenDMMessages();
-    };
+    div.onclick = () => startDM(otherId);
     list.appendChild(div);
   }
 
@@ -287,6 +400,10 @@ window.MSNMessenger = (function () {
     ref.off();
     ref.on('child_added', snap => {
       const msg = snap.val();
+      if (msg.userId !== userId && blockedUsers.has(msg.userId)) {
+        return;
+      }
+
       appendMessage(msg, false);
 
       if (msg.isNudge && msg.userId !== userId) {
@@ -295,9 +412,96 @@ window.MSNMessenger = (function () {
     });
   }
 
+  function toggleBlockBuddy() {
+    if (!activeBuddyId) return;
+    const target = activeBuddyId;
+
+    if (blockedUsers.has(target)) {
+      blockedUsers.delete(target);
+      alert(`Unblocked ${target}. You can now send and receive messages.`);
+    } else {
+      if (!confirm(`Are you sure you want to block ${target}? You will no longer receive messages or nudges from them.`)) return;
+      blockedUsers.add(target);
+    }
+
+    persistState();
+    updateHeaderControls();
+    updateNudgeVisibility();
+
+    const item = document.querySelector(`#dmList .group-item[data-id="${target}"] i`);
+    if (item) {
+      const isBlocked = blockedUsers.has(target);
+      item.className = isBlocked ? 'fas fa-ban' : 'far fa-comment-dots';
+      item.style.color = isBlocked ? '#c00' : '#ff9900';
+    }
+
+    startDM(target);
+  }
+
+  function deleteDM() {
+    if (!activeDMId || !activeBuddyId) return;
+    const target = activeBuddyId;
+    if (!confirm(`Are you sure you want to delete the conversation with ${target}?`)) return;
+
+    if (db) {
+      db.ref(`users/${userId}/dms/${target}`).remove().catch(e => console.warn(e));
+      db.ref(`dms/${activeDMId}/messages`).off();
+    }
+
+    startedDMs.delete(target);
+    const item = document.querySelector(`#dmList .group-item[data-id="${target}"]`);
+    if (item) item.remove();
+
+    persistState();
+    resetToWelcomeScreen();
+  }
+
+  function detachActiveChatListeners() {
+    if (!db) return;
+    if (activeGroupId) {
+      db.ref(`groups/${activeGroupId}/messages`).off();
+      db.ref(`groups/${activeGroupId}/users`).off();
+    }
+    if (activeDMId) {
+      db.ref(`dms/${activeDMId}/messages`).off();
+    }
+  }
+
+  function resetToWelcomeScreen() {
+    activeGroupId = null;
+    activeDMId = null;
+    activeBuddyId = null;
+    currentEncryptionKey = null;
+
+    updateChatHeader("Select or Join a Conversation", "G", false);
+    updateNudgeVisibility();
+    updateHeaderControls();
+
+    const chatArea = document.getElementById('chatArea');
+    if (chatArea) {
+      chatArea.innerHTML = `
+        <div style="background: #f0f7ff; padding: 12px; border: 1px solid #92bce3; border-radius: 4px;">
+          <b>Welcome to MSN Messenger '05 ChitChat Enclave!</b>
+          <p style="font-size: 11px; margin-top: 4px;">Select a room or buddy from the sidebar, or enter a new Room ID / Buddy User ID to begin chatting.</p>
+        </div>
+      `;
+    }
+
+    const listEl = document.getElementById('participantsList');
+    if (listEl) listEl.innerHTML = '';
+    const countEl = document.getElementById('buddyCount');
+    if (countEl) countEl.innerText = '0';
+  }
+
+  // Nudge, Messaging, Emoticons & Files
   function sendNudge() {
     if (!activeDMId) {
-      alert("Nudges are only available in Direct Buddy Chats (DMs)!");
+      alert("Nudges are only available in 1-on-1 Buddy Chats (DMs)!");
+      return;
+    }
+
+    if (activeBuddyId && blockedUsers.has(activeBuddyId)) {
+      alert("You cannot nudge a blocked buddy.");
       return;
     }
 
@@ -312,6 +516,11 @@ window.MSNMessenger = (function () {
         text: `⚡ [Sent you an MSN NUDGE!] ⚡`,
         timestamp: Date.now()
       });
+
+      db.ref(`users/${activeBuddyId}/dms/${userId}`).update({
+        lastUpdated: Date.now(),
+        lastMessage: "Sent you a Nudge!"
+      }).catch(e => console.warn(e));
     }
   }
 
@@ -362,24 +571,6 @@ window.MSNMessenger = (function () {
     toggleEmoticonPicker();
   }
 
-  function playWinkAnimation() {
-    const appWin = document.getElementById('appWindow');
-    const overlay = document.createElement('div');
-    overlay.style.position = 'absolute';
-    overlay.style.top = '0';
-    overlay.style.left = '0';
-    overlay.style.width = '100%';
-    overlay.style.height = '100%';
-    overlay.style.pointerEvents = 'none';
-    overlay.style.display = 'flex';
-    overlay.style.alignItems = 'center';
-    overlay.style.justifyContent = 'center';
-    overlay.style.zIndex = '9999';
-    overlay.innerHTML = `<i class="fas fa-magic" style="font-size: 110px; color: #9933ff; filter: drop-shadow(0 0 20px #ffcc00); animation: pulse 0.7s infinite alternate;"></i>`;
-    appWin.appendChild(overlay);
-    setTimeout(() => overlay.remove(), 2000);
-  }
-
   async function sendMessage() {
     const input = document.getElementById('messageText');
     const text = input.value.trim();
@@ -387,6 +578,11 @@ window.MSNMessenger = (function () {
 
     if (!activeGroupId && !activeDMId) {
       alert("Select a room or buddy first.");
+      return;
+    }
+
+    if (activeBuddyId && blockedUsers.has(activeBuddyId)) {
+      alert("You cannot send messages to a blocked buddy.");
       return;
     }
 
@@ -407,6 +603,11 @@ window.MSNMessenger = (function () {
         text,
         timestamp: Date.now()
       });
+
+      db.ref(`users/${activeBuddyId}/dms/${userId}`).update({
+        lastUpdated: Date.now(),
+        lastMessage: text
+      }).catch(e => console.warn(e));
     }
 
     input.value = '';
@@ -418,6 +619,12 @@ window.MSNMessenger = (function () {
 
     if (!activeGroupId && !activeDMId) {
       alert("Join an encrypted group or open a DM first.");
+      return;
+    }
+
+    if (activeBuddyId && blockedUsers.has(activeBuddyId)) {
+      alert("You cannot send files to a blocked buddy.");
+      event.target.value = '';
       return;
     }
 
@@ -454,6 +661,11 @@ window.MSNMessenger = (function () {
             fileSize: file.size,
             timestamp: Date.now()
           });
+
+          db.ref(`users/${activeBuddyId}/dms/${userId}`).update({
+            lastUpdated: Date.now(),
+            lastMessage: `Sent an attachment: ${file.name}`
+          }).catch(e => console.warn(e));
         };
         reader.readAsDataURL(file);
       }
@@ -605,7 +817,7 @@ window.MSNMessenger = (function () {
     const nameEl = document.getElementById('msnHeaderUsername');
     if (nameEl) nameEl.innerText = username;
     const idEl = document.getElementById('msnHeaderUserId');
-    if (idEl) idEl.innerText = `(${userId.substring(0, 8)}...)`;
+    if (idEl) idEl.innerText = `(ID: ${userId})`;
 
     const av = document.getElementById('msnHeaderAvatar');
     if (av) {
@@ -626,7 +838,8 @@ window.MSNMessenger = (function () {
       statusMsg: userStatusMsg,
       joinedGroups: Array.from(joinedGroups),
       groupPasswords,
-      startedDMs: Array.from(startedDMs)
+      startedDMs: Array.from(startedDMs),
+      blockedUsers: Array.from(blockedUsers)
     };
     localStorage.setItem('userData', JSON.stringify(payload));
     if (window.FirebaseSync) {
@@ -643,14 +856,17 @@ window.MSNMessenger = (function () {
   return {
     init,
     joinGroup,
+    exitGroup,
     startDM,
+    toggleBlockBuddy,
+    deleteDM,
     sendNudge,
     toggleParticipants,
     toggleEmoticonPicker,
     insertEmoticon,
-    playWinkAnimation,
     sendMessage,
     sendFile,
+    getUserId: () => userId,
     setListeningTrack: (trackStr) => {
       const el = document.getElementById('statusMessageInput');
       if (el) el.value = `Listening to: ${trackStr} ♪`;
