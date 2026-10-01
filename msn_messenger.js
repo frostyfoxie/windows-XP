@@ -1,21 +1,18 @@
 /**
  * MSN Messenger '05 Encrypted ChitChat Enclave Module
- * Zero-knowledge PBKDF2 (100k rounds) + AES-256-GCM authenticated encryption.
- * Dynamic Nudge: strictly restricted to DMs, shakes the recipient's screen via Firebase.
+ * Cryptographically secured with PBKDF2 (100k SHA-256 iterations) + AES-256-GCM.
  */
 window.MSNMessenger = (function () {
   let db = null;
   let userId = null;
   let username = null;
   let userAvatar = null;
-  let userColor = 0;
   let userStatus = 'online';
   let userStatusMsg = 'Listening to: 4. Crusher-P - Echo (3:50) ♪';
 
   let activeGroupId = null;
   let activeDMId = null;
   let currentEncryptionKey = null;
-  let participantsVisible = false;
 
   const joinedGroups = new Set();
   const groupPasswords = {};
@@ -26,7 +23,6 @@ window.MSNMessenger = (function () {
     userId = userState.userId;
     username = userState.username;
     userAvatar = userState.avatar;
-    userColor = userState.color;
     userStatus = userState.status || 'online';
     userStatusMsg = userState.statusMsg || 'Listening to: 4. Crusher-P - Echo (3:50) ♪';
 
@@ -39,7 +35,11 @@ window.MSNMessenger = (function () {
     updateUI();
   }
 
-  // Cryptographic Sub-routines
+  // Safe Firebase Key Sanitization (prevents path errors with '.', '#', '$', '[', ']')
+  function sanitizePath(id) {
+    return (id || '').replace(/[.#$\[\]\/]/g, '_').trim();
+  }
+
   async function deriveKey(password, saltStr) {
     const salt = new TextEncoder().encode(saltStr);
     const keyMaterial = await crypto.subtle.importKey(
@@ -77,25 +77,28 @@ window.MSNMessenger = (function () {
     );
   }
 
-  // Dynamic Nudge Visibility: Only available in Direct Message (DM) conversations
+  // Dynamic Nudge: Strictly visible in DMs, hidden in groups
   function updateNudgeVisibility() {
     const nudgeBtn = document.getElementById('msnNudgeBtn');
     if (!nudgeBtn) return;
     if (activeDMId) {
       nudgeBtn.style.display = 'inline-flex';
     } else {
-      nudgeBtn.style.display = 'none'; // Hidden when in group or when no DM is open
+      nudgeBtn.style.display = 'none';
     }
   }
 
-  // Groups
+  // Group Joining (Safely sanitized and error-handled)
   async function joinGroup() {
-    const gid = document.getElementById('groupIdInput').value.trim();
+    const rawGid = document.getElementById('groupIdInput').value.trim();
     const pwd = document.getElementById('groupPasswordInput').value;
-    if (!gid || !pwd) {
-      alert("Please enter both a Group ID and Passphrase.");
+
+    if (!rawGid || !pwd) {
+      alert("Please enter both a Room ID and an Encryption Passphrase.");
       return;
     }
+
+    const gid = sanitizePath(rawGid);
 
     try {
       activeGroupId = gid;
@@ -106,13 +109,14 @@ window.MSNMessenger = (function () {
       groupPasswords[gid] = pwd;
       persistState();
 
-      // Register presence in Firebase
-      db.ref(`groups/${gid}/users/${userId}`).set({
-        username,
-        avatar: userAvatar,
-        status: userStatus,
-        lastSeen: Date.now()
-      });
+      if (db) {
+        db.ref(`groups/${gid}/users/${userId}`).set({
+          username,
+          avatar: userAvatar,
+          status: userStatus,
+          lastSeen: Date.now()
+        }).catch(e => console.warn("Firebase group user sync warning:", e));
+      }
 
       updateChatHeader(`Group: #${gid}`, gid[0].toUpperCase(), true);
       addGroupToList(gid);
@@ -124,7 +128,7 @@ window.MSNMessenger = (function () {
       document.getElementById('groupPasswordInput').value = '';
     } catch (err) {
       console.error(err);
-      alert("Failed to join group: " + err.message);
+      alert("Encryption key derivation error: " + err.message);
     }
   }
 
@@ -143,7 +147,7 @@ window.MSNMessenger = (function () {
     div.onclick = async () => {
       let pwd = groupPasswords[gid];
       if (!pwd) {
-        pwd = prompt(`Enter encryption passphrase for Group "${gid}":`);
+        pwd = prompt(`Enter passphrase for Group "${gid}":`);
         if (!pwd) return;
         groupPasswords[gid] = pwd;
         persistState();
@@ -162,17 +166,20 @@ window.MSNMessenger = (function () {
   function listenGroupMessages() {
     if (!activeGroupId) return;
     const chatArea = document.getElementById('chatArea');
-    chatArea.innerHTML = '<div style="font-size: 11px; color: #555; padding: 10px;"><i class="fas fa-spinner fa-spin"></i> Establishing E2EE channel...</div>';
+    chatArea.innerHTML = '<div style="font-size: 11px; color: #555; padding: 10px;"><i class="fas fa-spinner fa-spin"></i> Establishing secure E2EE channel...</div>';
 
+    if (!db) return;
     const ref = db.ref(`groups/${activeGroupId}/messages`);
     ref.off();
     ref.on('child_added', snap => appendMessage(snap.val(), true));
   }
 
-  // Direct Messages
+  // Direct Buddy Messages
   function startDM() {
-    const otherId = document.getElementById('dmUserInput').value.trim();
-    if (!otherId) return;
+    const rawOtherId = document.getElementById('dmUserInput').value.trim();
+    if (!rawOtherId) return;
+    const otherId = sanitizePath(rawOtherId);
+
     if (otherId === userId) {
       alert("Cannot open direct chat with yourself.");
       return;
@@ -217,7 +224,7 @@ window.MSNMessenger = (function () {
   }
 
   function listenDMMessages() {
-    if (!activeDMId) return;
+    if (!activeDMId || !db) return;
     const chatArea = document.getElementById('chatArea');
     chatArea.innerHTML = '<div style="font-size: 11px; color: #555; padding: 10px;"><i class="fas fa-spinner fa-spin"></i> Connecting to Buddy DM...</div>';
 
@@ -227,32 +234,31 @@ window.MSNMessenger = (function () {
       const msg = snap.val();
       appendMessage(msg, false);
 
-      // Trigger cross-network Nudge if sent by the buddy
       if (msg.isNudge && msg.userId !== userId) {
         triggerNudgeShake();
       }
     });
   }
 
-  // Cross-device MSN Nudge
+  // Cross-Network MSN Nudge
   function sendNudge() {
     if (!activeDMId) {
-      alert("Nudges can only be sent in Direct Buddy Chats (DMs)!");
+      alert("Nudges are only available in Direct Buddy Chats (DMs)!");
       return;
     }
 
-    // Trigger local animation & chime
     triggerNudgeShake();
 
-    // Transmit nudge across Firebase to the recipient
-    db.ref(`dms/${activeDMId}/messages`).push().set({
-      userId,
-      username,
-      avatar: userAvatar,
-      isNudge: true,
-      text: `⚡ [You received an MSN NUDGE!] ⚡`,
-      timestamp: Date.now()
-    });
+    if (db) {
+      db.ref(`dms/${activeDMId}/messages`).push().set({
+        userId,
+        username,
+        avatar: userAvatar,
+        isNudge: true,
+        text: `⚡ [You received an MSN NUDGE!] ⚡`,
+        timestamp: Date.now()
+      });
+    }
   }
 
   function triggerNudgeShake() {
@@ -260,7 +266,6 @@ window.MSNMessenger = (function () {
     if (!appWin) return;
     appWin.classList.add('nudge-shake');
 
-    // Synthesize classic MSN Nudge sound
     if (window.WinampPlayer) {
       const ctx = window.WinampPlayer.getAudioContext();
       if (ctx) {
@@ -269,7 +274,7 @@ window.MSNMessenger = (function () {
           const gain = ctx.createGain();
           osc.type = 'sine';
           osc.frequency.setValueAtTime(680, ctx.currentTime);
-          osc.frequency.exponentialRampToValueAtTime(220, ctx.currentTime + 0.35);
+          osc.frequency.exponentialRampToValueAtTime(240, ctx.currentTime + 0.35);
           gain.gain.setValueAtTime(0.5, ctx.currentTime);
           gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
           osc.connect(gain);
@@ -283,7 +288,6 @@ window.MSNMessenger = (function () {
     setTimeout(() => appWin.classList.remove('nudge-shake'), 900);
   }
 
-  // Sending Messages & Encrypted Files
   async function sendMessage() {
     const input = document.getElementById('messageText');
     const text = input.value.trim();
@@ -294,7 +298,7 @@ window.MSNMessenger = (function () {
       return;
     }
 
-    if (activeGroupId) {
+    if (activeGroupId && db) {
       const encryptedObj = await encryptData(new TextEncoder().encode(text));
       db.ref(`groups/${activeGroupId}/messages`).push().set({
         userId,
@@ -303,7 +307,7 @@ window.MSNMessenger = (function () {
         encryptedText: encryptedObj,
         timestamp: Date.now()
       });
-    } else if (activeDMId) {
+    } else if (activeDMId && db) {
       db.ref(`dms/${activeDMId}/messages`).push().set({
         userId,
         username,
@@ -321,11 +325,11 @@ window.MSNMessenger = (function () {
     if (!file) return;
 
     if (!activeGroupId && !activeDMId) {
-      alert("Please join an encrypted group or open a DM first.");
+      alert("Join an encrypted group or open a DM first.");
       return;
     }
 
-    if (activeGroupId) {
+    if (activeGroupId && db) {
       const buffer = await file.arrayBuffer();
       const encryptedObj = await encryptData(buffer);
       db.ref(`groups/${activeGroupId}/messages`).push().set({
@@ -337,7 +341,7 @@ window.MSNMessenger = (function () {
         fileType: file.type,
         timestamp: Date.now()
       });
-    } else if (activeDMId) {
+    } else if (activeDMId && db) {
       const reader = new FileReader();
       reader.onload = () => {
         db.ref(`dms/${activeDMId}/messages`).push().set({
@@ -424,8 +428,9 @@ window.MSNMessenger = (function () {
   }
 
   function loadGroupParticipants() {
-    if (!activeGroupId) return;
+    if (!activeGroupId || !db) return;
     const listEl = document.getElementById('participantsList');
+    if (!listEl) return;
     listEl.innerHTML = '';
 
     db.ref(`groups/${activeGroupId}/users`).on('value', snap => {
@@ -453,9 +458,9 @@ window.MSNMessenger = (function () {
 
     const encStatus = document.getElementById('encryptionStatusText');
     if (isEncrypted) {
-      encStatus.innerHTML = '<span style="color: #00aa55;"><i class="fas fa-lock"></i> PBKDF2 + AES-256-GCM Secure Channel</span>';
+      encStatus.innerHTML = '<span style="color: #00aa55;"><i class="fas fa-lock"></i> PBKDF2 + AES-256-GCM Secure Room</span>';
     } else {
-      encStatus.innerHTML = '<span style="color: #ff9900;"><i class="fas fa-user-friends"></i> Direct Buddy Chat Active</span>';
+      encStatus.innerHTML = '<span style="color: #ff9900;"><i class="fas fa-user-friends"></i> Direct Buddy Chat</span>';
     }
   }
 
@@ -519,6 +524,17 @@ window.MSNMessenger = (function () {
       if (newAvatar) userAvatar = newAvatar;
       persistState();
       updateUI();
+    },
+    updateStatus: (status) => {
+      userStatus = status;
+      const dot = document.getElementById('msnStatusDot');
+      if (dot) {
+        if (status === 'online') dot.style.background = '#39b54a';
+        else if (status === 'busy') dot.style.background = '#ff0000';
+        else if (status === 'away') dot.style.background = '#fbb040';
+        else dot.style.background = '#888888';
+      }
+      persistState();
     }
   };
 })();
