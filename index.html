@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Windows XP - MSN Messenger '05 & Winamp 2.8</title>
+
+<!-- External Icon & Font Assets -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Tahoma:wght@400;700&family=Segoe+UI:wght@400;600;700&family=VT323&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+<style>
+:root {
+  --win-font: 'Tahoma', 'Segoe UI', Geneva, Verdana, sans-serif;
+  --digital-font: 'VT323', monospace;
+  --desktop-bg: radial-gradient(circle at 70% 30%, rgba(144, 202, 249, 0.4) 0%, transparent 50%),
+                linear-gradient(to bottom, #1f62cb 0%, #2989d8 35%, #72b938 72%, #42821b 100%);
+  --crt-scanline-opacity: 0.35;
+  --crt-flicker-opacity: 0.04;
+  --crt-vignette-opacity: 0.6;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--win-font); background: #000; color: #000; }
+
+#crtViewport { position: relative; width: 100vw; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+.crt-top-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 999999; }
+.crt-scanlines { position: absolute; width: 100%; height: 100%; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.8) 50%); background-size: 100% 4px; opacity: var(--crt-scanline-opacity); }
+.crt-vignette { position: absolute; width: 100%; height: 100%; background: radial-gradient(circle at 50% 50%, transparent 60%, rgba(0, 0, 0, 0.95) 100%); opacity: var(--crt-vignette-opacity); }
+.crt-flicker-layer { position: absolute; width: 100%; height: 100%; background: rgba(255,255,255,0.05); opacity: var(--crt-flicker-opacity); animation: crtFlickerAnim 0.08s infinite alternate; }
+
+@keyframes crtFlickerAnim { 0% { opacity: calc(var(--crt-flicker-opacity) * 0.5); } 100% { opacity: calc(var(--crt-flicker-opacity) * 1.5); } }
+
+.crt-screen { position: relative; flex: 1; width: 100%; height: 100%; overflow: hidden; background: #000; }
+#desktop { width: 100%; height: calc(100% - 32px); position: relative; background: var(--desktop-bg); background-size: cover !important; padding: 16px; display: flex; flex-direction: column; flex-wrap: wrap; gap: 16px; }
+
+.desktop-icon { width: 82px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; text-shadow: 1px 1px 3px rgba(0,0,0,0.9); cursor: pointer; padding: 6px 4px; border: 1px transparent dashed; border-radius: 4px; z-index: 2; }
+.desktop-icon:hover { background-color: rgba(11, 93, 218, 0.45); border-color: rgba(255, 255, 255, 0.6); }
+.desktop-icon-badge { font-size: 32px; margin-bottom: 6px; width: 46px; height: 46px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); }
+.desktop-icon span { font-size: 11px; text-align: center; }
+
+/* Windows XP System Window */
+.xp-window { position: absolute; background: #f0f6fe; border: 3px solid #0054e3; border-top-left-radius: 8px; border-top-right-radius: 8px; box-shadow: 4px 6px 20px rgba(0,0,0,0.45); display: flex; flex-direction: column; z-index: 10; overflow: visible; }
+.xp-window.window-maximized { top: 0 !important; left: 0 !important; width: 100% !important; height: calc(100% - 32px) !important; border-radius: 0 !important; border: none !important; }
+.xp-window.inactive { border-color: #7b9ebd; box-shadow: 2px 4px 10px rgba(0,0,0,0.25); }
+
+.xp-titlebar { background: linear-gradient(to bottom, #0058ee 0%, #388efd 12%, #0054e3 85%, #002e80 100%); color: #ffffff; padding: 4px 8px; display: flex; align-items: center; justify-content: space-between; font-weight: bold; font-size: 12px; cursor: move; height: 30px; border-top-left-radius: 5px; border-top-right-radius: 5px; }
+.xp-window.window-maximized .xp-titlebar { border-radius: 0; cursor: default; }
+.xp-window.inactive .xp-titlebar { background: linear-gradient(to bottom, #7a9cc6 0%, #a2b7cd 50%, #6e88a3 100%); color: #d8e2ed; }
+
+.xp-controls { display: flex; gap: 3px; align-items: center; }
+.xp-btn-ctrl { width: 21px; height: 21px; border-radius: 3px; border: 1px solid #ffffff; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; color: white; cursor: pointer; }
+.xp-btn-minimize { background: linear-gradient(to bottom, #388efd, #0054e3); }
+.xp-btn-maximize { background: linear-gradient(to bottom, #388efd, #0054e3); }
+.xp-btn-close { background: linear-gradient(to bottom, #e76646, #c22f0e); border-color: #ffe6e0; }
+
+/* 8-Directional Window Resize Handles */
+.rh { position: absolute; z-index: 1000; }
+.rh-n { top: -6px; left: 10px; right: 10px; height: 10px; cursor: n-resize; }
+.rh-s { bottom: -6px; left: 10px; right: 10px; height: 10px; cursor: s-resize; }
+.rh-e { right: -6px; top: 10px; bottom: 10px; width: 10px; cursor: e-resize; }
+.rh-w { left: -6px; top: 10px; bottom: 10px; width: 10px; cursor: w-resize; }
+.rh-nw { top: -6px; left: -6px; width: 14px; height: 14px; cursor: nw-resize; }
+.rh-ne { top: -6px; right: -6px; width: 14px; height: 14px; cursor: ne-resize; }
+.rh-sw { bottom: -6px; left: -6px; width: 14px; height: 14px; cursor: sw-resize; }
+.rh-se { bottom: -3px; right: -3px; width: 16px; height: 16px; cursor: se-resize; background: linear-gradient(135deg, transparent 50%, #444 50%); }
+.xp-window.window-maximized .rh { display: none !important; }
+
+/* MSN Header & Layout */
+.msn-user-header { background: linear-gradient(to bottom, #e3effd 0%, #c3ddf9 60%, #b2d3f7 100%); padding: 8px 12px; border-bottom: 1px solid #84aee0; display: flex; align-items: center; gap: 12px; }
+.msn-avatar-frame { width: 52px; height: 52px; border: 2px solid #ffffff; border-radius: 4px; background: #2b7bc6; display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; font-weight: bold; position: relative; cursor: pointer; overflow: hidden; }
+.msn-avatar-frame img { width: 100%; height: 100%; object-fit: cover; }
+.msn-status-dot { position: absolute; bottom: -2px; right: -2px; width: 14px; height: 14px; border-radius: 50%; border: 2px solid #ffffff; background: #39b54a; }
+.msn-username { font-weight: bold; font-size: 13px; color: #003399; }
+.msn-status-msg { font-size: 11px; color: #2b578c; border: 1px solid transparent; padding: 2px 4px; border-radius: 3px; width: 100%; background: rgba(255,255,255,0.4); }
+
+.xp-menubar { background: #eef5fc; display: flex; gap: 12px; padding: 3px 8px; font-size: 11px; border-bottom: 1px solid #b2d1f0; }
+.xp-menu-item { cursor: pointer; padding: 2px 6px; border-radius: 2px; color: #003399; }
+.xp-menu-item:hover { background: #316ac5; color: white; }
+
+.xp-body { flex: 1; padding: 6px; display: flex; flex-direction: column; overflow: hidden; background: #eef5fc; }
+#app { width: 100%; height: 100%; display: flex; background: #eef5fc; }
+#sidebar { width: 250px; min-width: 180px; max-width: 380px; display: flex; flex-direction: column; background: linear-gradient(to bottom, #e3effd, #d1e4f9); border: 1px solid #94b7e0; border-radius: 6px; padding: 6px; gap: 6px; }
+.panel-splitter { width: 7px; background: #c3ddf9; border: 1px solid #9bc0e7; cursor: col-resize; }
+
+.xp-tab-btn { flex: 1; padding: 6px; font-size: 11px; font-weight: bold; background: linear-gradient(to bottom, #ffffff, #d3e5f8); border: 1px solid #8eb9e5; cursor: pointer; color: #0e3f73; }
+.xp-tab-btn.active { background: #ffffff; border-bottom: 2px solid #ffffff; color: #003399; }
+.group-list { flex: 1; overflow-y: auto; padding: 4px; background: #ffffff; border: 2px inset #92bce3; border-radius: 3px; }
+.group-item { padding: 6px 8px; margin-top: 3px; cursor: pointer; display: flex; align-items: center; font-size: 12px; border-radius: 3px; background: #f7fafe; border: 1px solid #e1ecf7; }
+.group-item-avatar { width: 24px; height: 24px; border-radius: 3px; margin-right: 8px; display: flex; align-items: center; justify-content: center; font-weight: bold; background: #0054e3; color: white; font-size: 11px; }
+
+.xp-input { width: 100%; padding: 5px 7px; font-size: 11px; border: 2px inset #7f9db9; outline: none; background: #ffffff; }
+.xp-button { padding: 5px 12px; font-size: 11px; font-weight: bold; color: #003399; background: linear-gradient(to bottom, #ffffff 0%, #e1effe 70%, #cae3fe 100%); border: 1px solid #7daada; border-radius: 3px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
+
+#chatContainer { flex: 1; display: flex; flex-direction: column; gap: 6px; padding-left: 6px; overflow: hidden; }
+#chatHeader { padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; background: linear-gradient(to bottom, #ffffff, #e3effd); border: 1px solid #9bc0e7; border-radius: 4px; }
+.msn-action-bar { display: flex; align-items: center; gap: 6px; padding: 5px 8px; background: linear-gradient(to bottom, #ffffff, #e3effd); border: 1px solid #92bce3; border-radius: 4px; }
+.msn-action-btn { padding: 4px 10px; font-size: 11px; font-weight: bold; color: #003399; background: linear-gradient(to bottom, #ffffff, #e1effe); border: 1px solid #96beee; border-radius: 3px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
+
+.message-container { flex: 1; padding: 12px; overflow-y: auto; background: #ffffff; border: 2px inset #92bce3; border-radius: 4px; font-size: 12px; }
+.message { margin-bottom: 10px; display: flex; flex-direction: column; }
+.message.outgoing { align-items: flex-end; }
+.message.incoming { align-items: flex-start; }
+.message-header { font-size: 11px; font-weight: bold; color: #003399; display: flex; gap: 6px; }
+.message-content { display: flex; align-items: flex-start; gap: 8px; }
+.message.outgoing .message-content { flex-direction: row-reverse; }
+.message-avatar { width: 28px; height: 28px; border-radius: 3px; background: #0054e3; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 11px; flex-shrink: 0; background-size: cover; }
+.message .text { padding: 6px 10px; background: #f4f8fe; border: 1px solid #d0e2f5; border-radius: 4px; word-break: break-word; }
+.message.outgoing .text { background: #dbeefd; border-color: #92bce3; }
+.chat-shared-img { max-width: 260px; max-height: 180px; border-radius: 4px; border: 2px solid #84aee0; margin-top: 4px; display: block; }
+.file-attachment-link { color: #003399; text-decoration: underline; font-weight: bold; }
+
+.nudge-shake { animation: msnNudgeAnim 0.45s ease-in-out infinite; }
+@keyframes msnNudgeAnim {
+  0% { transform: translate(0, 0) rotate(0deg); }
+  15% { transform: translate(-10px, -8px) rotate(-1deg); }
+  30% { transform: translate(10px, 8px) rotate(1deg); }
+  45% { transform: translate(-8px, 6px) rotate(0deg); }
+  60% { transform: translate(8px, -6px) rotate(1deg); }
+  100% { transform: translate(0, 0) rotate(0deg); }
+}
+
+/* =======================================================
+   WEBAMP-EXACT REPLICA GRADIENT SLIDERS (WINAMP 2.80)
+   ======================================================= */
+#winampContainerWindow { width: 275px; z-index: 120; }
+.wa-window-panel { background: linear-gradient(to bottom, #30303c, #1e1e28); border: 2px solid #5d5d6d; box-shadow: inset 1px 1px 0 #7e7e8e, inset -1px -1px 0 #111; padding: 3px; display: flex; flex-direction: column; color: #00ff00; font-family: var(--digital-font); }
+.wa-titlebar { background: linear-gradient(to right, #0d1259 0%, #173fa5 30%, #2062cc 50%, #173fa5 70%, #0d1259 100%); color: #d1e2ff; font-family: Arial, sans-serif; font-size: 9px; font-weight: bold; padding: 2px 4px; display: flex; justify-content: space-between; cursor: move; height: 18px; }
+.wa-title-btn { width: 9px; height: 9px; background: linear-gradient(to bottom, #5065a8, #223060); border: 1px solid #738bd8; font-size: 7px; display: flex; align-items: center; justify-content: center; color: #fff; cursor: pointer; }
+.wa-main-display { background: #000000; border: 1px solid #4a4a58; padding: 4px; display: flex; flex-direction: column; gap: 3px; }
+.wa-timer-digit { font-size: 30px; color: #00ff00; text-shadow: 0 0 8px #00ff00; line-height: 1; }
+
+/* Webamp Gradient Wedge Track for Volume & Balance */
+.wa-slider-wrap { position: relative; height: 13px; display: flex; align-items: center; flex: 1; }
+.wa-vol-wedge-track {
+  width: 100%; height: 9px;
+  background: linear-gradient(to right, #111 0%, #222 100%);
+  background-image: repeating-linear-gradient(90deg, #ff2200 0px, #ff2200 2px, #000 2px, #000 3px, #00ff00 3px, #00ff00 5px, #000 5px, #000 6px);
+  border: 1px solid #333;
+  clip-path: polygon(0% 80%, 100% 10%, 100% 90%, 0% 90%);
+}
+.wa-bal-track {
+  width: 100%; height: 7px;
+  background: #111;
+  border: 1px solid #333;
+  background-image: linear-gradient(90deg, transparent 48%, #00ff00 48%, #00ff00 52%, transparent 52%);
+}
+
+.wa-webamp-slider {
+  -webkit-appearance: none;
+  width: 100%; height: 13px;
+  background: transparent;
+  outline: none;
+  position: absolute; top: 0; left: 0;
+  cursor: pointer;
+}
+.wa-webamp-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 11px;
+  background: linear-gradient(to bottom, #dcdce6 0%, #8e8e9e 45%, #555566 50%, #222228 100%);
+  border: 1px solid #f0f0f5;
+  border-bottom-color: #111; border-right-color: #111;
+  box-shadow: inset 1px 1px 0 #fff;
+  cursor: pointer;
+}
+
+/* Webamp Seek Bar: Classic Gold Metallic Thumb */
+.wa-seek-bar-track {
+  width: 100%; height: 10px;
+  background: #000;
+  border: 1px solid #3a3a46;
+  position: relative;
+}
+.wa-seek-slider {
+  -webkit-appearance: none;
+  width: 100%; height: 10px;
+  background: transparent;
+  outline: none;
+  position: absolute; top: 0; left: 0;
+}
+.wa-seek-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 28px; height: 10px;
+  background: linear-gradient(to bottom, #e2bb69 0%, #a98032 50%, #684813 100%);
+  border: 1px solid #ffe8aa;
+  border-bottom-color: #332205; border-right-color: #332205;
+  box-shadow: inset 1px 1px 0 #fff;
+  cursor: pointer;
+}
+
+/* Webamp Vertical EQ Sliders with Green Line Thumb */
+.wa-vert-slider {
+  -webkit-appearance: none;
+  writing-mode: bt-lr;
+  appearance: slider-vertical;
+  width: 12px; height: 56px;
+  background: #000;
+  border: 1px solid #282834;
+  outline: none;
+}
+.wa-vert-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px; height: 10px;
+  background: linear-gradient(to bottom, #aaaaaa 0%, #555555 45%, #00ff00 46%, #00ff00 54%, #333333 55%, #111111 100%);
+  border: 1px solid #ffffff;
+  border-bottom-color: #000;
+  cursor: pointer;
+}
+
+.wa-toggle-pill-btn { background: #333; border: 1px solid #666; color: #888; font-size: 8px; font-weight: bold; padding: 1px 5px; cursor: pointer; }
+.wa-toggle-pill-btn.active { background: #005500; color: #00ff00; border-color: #00ff00; }
+
+.wa-playlist-screen { height: 100px; background: #000; border: 1px solid #333; overflow-y: auto; font-size: 13px; color: #00ff00; }
+.wa-pl-item { padding: 2px 6px; display: flex; justify-content: space-between; cursor: pointer; }
+.wa-pl-item.active { background: #0000aa; color: #fff; }
+
+/* Windows Taskbar */
+#taskbar { height: 32px; width: 100%; background: linear-gradient(to bottom, #1f2f86 0%, #316ac5 3%, #245edb 12%, #1941a5 100%); position: absolute; bottom: 0; left: 0; z-index: 100000; display: flex; align-items: center; padding: 0 4px; justify-content: space-between; }
+.xp-start-btn { height: 28px; padding: 0 14px 0 10px; background: linear-gradient(to bottom, #66c164 0%, #3e9a3b 25%, #238320 85%, #186315 100%); border: 1px solid #145012; border-radius: 0 12px 12px 0; display: flex; align-items: center; gap: 8px; font-weight: bold; font-style: italic; color: white; cursor: pointer; }
+.taskbar-items { display: flex; gap: 3px; flex: 1; margin: 0 8px; overflow-x: auto; align-items: center; }
+.taskbar-tab { height: 25px; min-width: 120px; max-width: 180px; padding: 2px 8px; background: linear-gradient(to bottom, #388efd, #1e52b7); border: 1px solid #103380; border-radius: 3px; color: white; display: flex; align-items: center; gap: 6px; font-size: 11px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.taskbar-tab.active { background: linear-gradient(to bottom, #103175, #1d4d9b); box-shadow: inset 1px 1px 3px rgba(0,0,0,0.7); }
+.system-tray { height: 28px; padding: 2px 12px; background: linear-gradient(to bottom, #0c8fea, #0968aa 40%, #085993 100%); border-left: 1px solid #103a60; display: flex; align-items: center; gap: 12px; color: white; font-size: 11px; }
+
+#startMenu { position: absolute; bottom: 32px; left: 0; width: 280px; background: #fff; border: 2px solid #0054e3; border-top-right-radius: 8px; box-shadow: 4px 4px 18px rgba(0,0,0,0.5); z-index: 100001; display: none; flex-direction: column; }
+.start-header { background: linear-gradient(to bottom, #0058ee, #388efd); padding: 10px; color: white; font-weight: bold; display: flex; gap: 10px; align-items: center; }
+.start-item { padding: 8px 14px; display: flex; align-items: center; gap: 10px; font-size: 11px; cursor: pointer; color: #333; }
+.start-item:hover { background: #316ac5; color: white; }
+
+.xp-modal { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.45); z-index: 200000; display: flex; align-items: center; justify-content: center; }
+.modal-content { width: 360px; background: #ece9d8; border: 3px solid #0054e3; border-radius: 6px; }
+.modal-header { background: linear-gradient(to bottom, #0058ee, #0054e3); color: white; padding: 5px 10px; font-size: 12px; font-weight: bold; display: flex; justify-content: space-between; }
+.modal-body { padding: 14px; font-size: 12px; }
+.modal-footer { padding: 8px; background: #e0dad0; display: flex; justify-content: flex-end; gap: 6px; }
+
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div id="crtViewport">
+  <div class="crt-top-overlay">
+    <div class="crt-scanlines"></div>
+    <div class="crt-vignette"></div>
+    <div class="crt-flicker-layer"></div>
+  </div>
+
+  <div id="crtScreen" class="crt-screen">
+    
+    <!-- DESKTOP ICONS -->
+    <div id="desktop" onclick="handleDesktopClick(event)">
+      <div class="desktop-icon" onclick="WindowManager.openOrRestore('appWindow')">
+        <div class="desktop-icon-badge"><i class="fab fa-replyd" style="color: #ff9900;"></i></div>
+        <span>MSN Messenger</span>
+      </div>
+
+      <div class="desktop-icon" onclick="WindowManager.openOrRestore('winampContainerWindow')">
+        <div class="desktop-icon-badge"><i class="fas fa-bolt" style="color: #ffcc00;"></i></div>
+        <span>Winamp 2.8</span>
+      </div>
+
+      <div class="desktop-icon" onclick="WindowManager.openOrRestore('displaySettingsWindow')">
+        <div class="desktop-icon-badge"><i class="fas fa-tv" style="color: #00ffcc;"></i></div>
+        <span>CRT & Wallpaper</span>
+      </div>
+
+      <div class="desktop-icon" onclick="WindowManager.openOrRestore('minesweeperWindow')">
+        <div class="desktop-icon-badge"><i class="fas fa-bomb" style="color: #ff4444;"></i></div>
+        <span>Minesweeper</span>
+      </div>
+
+      <div class="desktop-icon" onclick="WindowManager.openOrRestore('notepadWindow')">
+        <div class="desktop-icon-badge"><i class="fas fa-file-alt" style="color: #ffffff;"></i></div>
+        <span>Notepad</span>
+      </div>
+    </div>
+
+    <!-- WINDOW 1: MSN MESSENGER '05 -->
+    <div id="appWindow" class="xp-window" style="top: 25px; left: 25px; width: 920px; height: 620px;">
+      <div class="xp-titlebar" id="appWindowHeader" ondblclick="WindowManager.toggleMaximize('appWindow')">
+        <div style="display: flex; gap: 8px; align-items: center; pointer-events: none;">
+          <i class="fab fa-replyd" style="color: #ff9900;"></i>
+          <span>MSN Messenger '05 - ChitChat E2EE Enclave</span>
+        </div>
+        <div class="xp-controls">
+          <div class="xp-btn-ctrl xp-btn-minimize" onclick="WindowManager.minimize('appWindow')">_</div>
+          <div class="xp-btn-ctrl xp-btn-maximize" id="appWindowMaxBtn" onclick="WindowManager.toggleMaximize('appWindow')">□</div>
+          <div class="xp-btn-ctrl xp-btn-close" onclick="WindowManager.close('appWindow')">✕</div>
+        </div>
+      </div>
+
+      <div class="msn-user-header">
+        <div class="msn-avatar-frame" id="msnHeaderAvatar" onclick="openProfileModal()">
+          <span>U</span>
+          <div class="msn-status-dot" id="msnStatusDot"></div>
+        </div>
+        <div style="flex: 1;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="msn-username" id="msnHeaderUsername">Loading...</span>
+            <span style="font-size: 10px; color: #555;" id="msnHeaderUserId">(ID: ...)</span>
+          </div>
+          <input type="text" id="statusMessageInput" class="msn-status-msg" value="Listening to: 4. Crusher-P - Echo (3:50) ♪">
+        </div>
+      </div>
+
+      <div class="xp-menubar">
+        <span class="xp-menu-item" onclick="openProfileModal()">File (Profile)</span>
+        <span class="xp-menu-item" onclick="showSecurityInfo()">Security (E2EE)</span>
+      </div>
+
+      <div class="xp-body">
+        <div id="app">
+          <div id="sidebar">
+            <div style="display: flex; gap: 4px;">
+              <button id="groupTab" class="xp-tab-btn active" onclick="showGroupsTab()">Groups</button>
+              <button id="dmTab" class="xp-tab-btn" onclick="showDMsTab()">DMs</button>
+            </div>
+
+            <div id="groupList" class="group-list"></div>
+            <div id="groupControls" style="display: flex; flex-direction: column; gap: 4px;">
+              <input type="text" id="groupIdInput" class="xp-input" placeholder="Room ID (e.g. retro-chat)">
+              <input type="password" id="groupPasswordInput" class="xp-input" placeholder="PBKDF2 Password">
+              <button class="xp-button" onclick="MSNMessenger.joinGroup()"><i class="fas fa-lock"></i> Join / Create</button>
+            </div>
+
+            <div id="dmList" class="group-list hidden"></div>
+            <div id="dmControls" class="hidden" style="display: flex; flex-direction: column; gap: 4px;">
+              <input type="text" id="dmUserInput" class="xp-input" placeholder="Buddy User ID">
+              <button class="xp-button" onclick="MSNMessenger.startDM()"><i class="fas fa-user-plus"></i> Open Buddy Chat</button>
+            </div>
+          </div>
+
+          <div class="panel-splitter" id="sidebarSplitter"></div>
+
+          <div id="chatContainer">
+            <div id="chatHeader">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <div class="chat-avatar" id="chatAvatar" style="width: 32px; height: 32px; background: #0054e3; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">G</div>
+                <div>
+                  <div id="chatTitle" style="font-weight: bold; color: #003399;">Select or Join a Conversation</div>
+                  <div id="encryptionStatusText" style="font-size: 10px; color: #0288d1;">Zero-Knowledge Client-Side Secured</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="msn-action-bar">
+              <!-- Nudge button is dynamically toggled: visible in DMs, hidden in groups -->
+              <button id="msnNudgeBtn" class="msn-action-btn" style="display: none;" onclick="MSNMessenger.sendNudge()" title="Send Nudge"><i class="fas fa-bell" style="color: #ff9900;"></i> Nudge</button>
+              <label class="msn-action-btn" style="cursor: pointer;">
+                <i class="fas fa-paperclip" style="color: #00aa55;"></i> Send File
+                <input type="file" id="fileUpload" style="display: none;" onchange="MSNMessenger.sendFile(event)">
+              </label>
+            </div>
+
+            <div id="chatArea" class="message-container">
+              <div style="background: #f0f7ff; padding: 12px; border: 1px solid #92bce3; border-radius: 4px;">
+                <b>Welcome to MSN Messenger '05 ChitChat Enclave!</b>
+                <p style="font-size: 11px; margin-top: 4px;">All communications are backed up to Firebase while remaining cryptographically private with PBKDF2/AES-GCM encryption.</p>
+              </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 4px; padding: 6px; background: #dbeafc; border-radius: 4px;">
+              <textarea id="messageText" class="xp-input" style="height: 40px; resize: none;" placeholder="Type a message..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();MSNMessenger.sendMessage();}"></textarea>
+              <div style="display: flex; justify-content: flex-end;">
+                <button class="xp-button" onclick="MSNMessenger.sendMessage()"><i class="fas fa-paper-plane"></i> Send</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- WINDOW 2: WINAMP 2.80 (WEBAMP REPLICA) -->
+    <div id="winampContainerWindow" class="xp-window" style="top: 30px; left: calc(100vw - 295px); background: none; border: none; box-shadow: none;">
+      <div class="wa-window-panel">
+        <div class="wa-titlebar" id="winampHeader">
+          <div style="display: flex; gap: 4px; align-items: center;">
+            <i class="fas fa-bolt" style="color: #ffcc00;"></i>
+            <span>WINAMP</span>
+          </div>
+          <div style="display: flex; gap: 2px;">
+            <div class="wa-title-btn" onclick="WindowManager.minimize('winampContainerWindow')">_</div>
+            <div class="wa-title-btn" onclick="WindowManager.close('winampContainerWindow')">✕</div>
+          </div>
+        </div>
+
+        <div class="wa-main-display">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div class="wa-timer-digit" id="winampTimer">01:51</div>
+            <div style="width: 72px; height: 32px; background: #000; border: 1px solid #222;">
+              <canvas id="winampVisCanvas" width="72" height="32"></canvas>
+            </div>
+          </div>
+          <div style="overflow: hidden; white-space: nowrap; border: 1px solid #143814; padding: 1px 4px; background: #000;">
+            <div id="winampTrackTitle" style="color: #00ff00; font-size: 13px;">4. Crusher-P - Echo (3:50)</div>
+          </div>
+        </div>
+
+        <!-- Volume & Balance Sliders: Authentic Webamp Wedge Gradient -->
+        <div style="display: flex; align-items: center; gap: 6px; padding: 4px 0;">
+          <span style="font-size: 8px; color: #888;">VOL</span>
+          <div class="wa-slider-wrap">
+            <div class="wa-vol-wedge-track"></div>
+            <input type="range" class="wa-webamp-slider" id="winampVolume" min="0" max="100" value="80" oninput="WinampPlayer.setVolume(this.value)">
+          </div>
+
+          <span style="font-size: 8px; color: #888;">BAL</span>
+          <div class="wa-slider-wrap">
+            <div class="wa-bal-track"></div>
+            <input type="range" class="wa-webamp-slider" id="winampBalance" min="-100" max="100" value="0" oninput="WinampPlayer.setBalance(this.value)">
+          </div>
+
+          <button class="wa-toggle-pill-btn active" id="waEqToggleBtn" onclick="WinampPlayer.toggleEq()">EQ</button>
+          <button class="wa-toggle-pill-btn active" id="waPlToggleBtn" onclick="WinampPlayer.togglePl()">PL</button>
+        </div>
+
+        <!-- Seek Bar: Classic Gold Metallic Thumb -->
+        <div style="padding: 2px 0;">
+          <div class="wa-seek-bar-track">
+            <input type="range" class="wa-seek-slider" id="winampSeekBar" min="0" max="100" value="48" oninput="WinampPlayer.seek(this.value)">
+          </div>
+        </div>
+
+        <!-- Transport Buttons -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 3px; background: #1a1a24; padding: 3px;">
+          <div style="display: flex; gap: 2px;">
+            <button class="wa-title-btn" style="width: 22px; height: 18px;" onclick="WinampPlayer.prev()"><i class="fas fa-step-backward"></i></button>
+            <button class="wa-title-btn" id="waPlayBtn" style="width: 22px; height: 18px;" onclick="WinampPlayer.play()"><i class="fas fa-play"></i></button>
+            <button class="wa-title-btn" style="width: 22px; height: 18px;" onclick="WinampPlayer.pause()"><i class="fas fa-pause"></i></button>
+            <button class="wa-title-btn" style="width: 22px; height: 18px;" onclick="WinampPlayer.stop()"><i class="fas fa-stop"></i></button>
+            <button class="wa-title-btn" style="width: 22px; height: 18px;" onclick="WinampPlayer.next()"><i class="fas fa-step-forward"></i></button>
+            <label class="wa-title-btn" style="width: 22px; height: 18px; cursor: pointer;">
+              <i class="fas fa-eject"></i>
+              <input type="file" accept="audio/*" style="display:none;" onchange="WinampPlayer.loadAudioFile(event)">
+            </label>
+          </div>
+
+          <div style="display: flex; gap: 3px;">
+            <button class="wa-toggle-pill-btn active" id="waShuffleBtn" onclick="WinampPlayer.toggleShuffle()">SHUFFLE</button>
+            <button class="wa-toggle-pill-btn active" id="waRepeatBtn" onclick="WinampPlayer.toggleRepeat()"><i class="fas fa-redo"></i></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- EQUALIZER PANEL WITH SPLINE CANVAS -->
+      <div class="wa-window-panel" id="waEqWindowPanel" style="border-top: 1px solid #111;">
+        <div class="wa-titlebar">
+          <span>WINAMP EQUALIZER</span>
+          <div class="wa-title-btn" onclick="WinampPlayer.toggleEq()">✕</div>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 2px 4px;">
+          <button class="wa-toggle-pill-btn active" id="waEqOnBtn" onclick="WinampPlayer.toggleEqOn()">ON</button>
+          <div style="height: 14px; flex: 1; margin: 0 6px; background: #000; border: 1px solid #333;">
+            <canvas id="waEqSplineCanvas" width="120" height="14"></canvas>
+          </div>
+        </div>
+        <div style="display: flex; justify-content: space-between; padding: 4px; background: #191922;">
+          <input type="range" class="wa-vert-slider" min="-12" max="12" value="0" oninput="WinampPlayer.drawEqSpline()">
+          <input type="range" class="wa-vert-slider" min="-12" max="12" value="3" oninput="WinampPlayer.drawEqSpline()">
+          <input type="range" class="wa-vert-slider" min="-12" max="12" value="2" oninput="WinampPlayer.drawEqSpline()">
+          <input type="range" class="wa-vert-slider" min="-12" max="12" value="-1" oninput="WinampPlayer.drawEqSpline()">
+          <input type="range" class="wa-vert-slider" min="-12" max="12" value="-2" oninput="WinampPlayer.drawEqSpline()">
+          <input type="range" class="wa-vert-slider" min="-12" max="12" value="0" oninput="WinampPlayer.drawEqSpline()">
+          <input type="range" class="wa-vert-slider" min="-12" max="12" value="2" oninput="WinampPlayer.drawEqSpline()">
+          <input type="range" class="wa-vert-slider" min="-12" max="12" value="4" oninput="WinampPlayer.drawEqSpline()">
+          <input type="range" class="wa-vert-slider" min="-12" max="12" value="3" oninput="WinampPlayer.drawEqSpline()">
+          <input type="range" class="wa-vert-slider" min="-12" max="12" value="1" oninput="WinampPlayer.drawEqSpline()">
+        </div>
+      </div>
+
+      <!-- PLAYLIST PANEL -->
+      <div class="wa-window-panel" id="waPlWindowPanel" style="border-top: 1px solid #111;">
+        <div class="wa-titlebar">
+          <span>WINAMP PLAYLIST</span>
+          <div class="wa-title-btn" onclick="WinampPlayer.togglePl()">✕</div>
+        </div>
+        <div class="wa-playlist-screen" id="playlistItems"></div>
+        <div style="display: flex; justify-content: space-between; padding: 2px 4px; font-size: 9px; background: #181822;">
+          <span id="playlistTrackCount">0 tracks / 0:00</span>
+          <label style="cursor: pointer; color: #fff;">+ ADD <input type="file" accept="audio/*" style="display:none;" onchange="WinampPlayer.loadAudioFile(event)"></label>
+        </div>
+      </div>
+    </div>
+
+    <!-- WINDOW 3: DISPLAY PROPERTIES -->
+    <div id="displaySettingsWindow" class="xp-window hidden" style="top: 80px; left: 100px; width: 360px; height: 340px;">
+      <div class="xp-titlebar" id="displaySettingsWindowHeader">
+        <span>Display Properties - CRT & Wallpaper</span>
+        <div class="xp-controls">
+          <div class="xp-btn-ctrl xp-btn-close" onclick="WindowManager.close('displaySettingsWindow')">✕</div>
+        </div>
+      </div>
+      <div class="xp-body" style="gap: 10px;">
+        <div style="background: #fff; padding: 8px; border: 1px solid #7daada;">
+          <b>Wallpaper Background</b>
+          <label class="xp-button" style="width: 100%; margin-top: 6px; cursor: pointer;">
+            Upload Image / GIF
+            <input type="file" accept="image/*,.gif" style="display: none;" onchange="FirebaseSync.setWallpaper(event)">
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- WINDOW 4: MINESWEEPER -->
+    <div id="minesweeperWindow" class="xp-window hidden" style="top: 100px; left: 160px; width: 200px; height: 240px;">
+      <div class="xp-titlebar" id="minesweeperWindowHeader">
+        <span>Minesweeper</span>
+        <div class="xp-controls">
+          <div class="xp-btn-ctrl xp-btn-close" onclick="WindowManager.close('minesweeperWindow')">✕</div>
+        </div>
+      </div>
+      <div class="xp-body" style="align-items: center; padding: 8px;">
+        <div id="minesGrid" style="display: grid; grid-template-columns: repeat(8, 18px); gap: 1px; background: #888;"></div>
+      </div>
+    </div>
+
+    <!-- WINDOW 5: NOTEPAD -->
+    <div id="notepadWindow" class="xp-window hidden" style="top: 120px; left: 200px; width: 320px; height: 240px;">
+      <div class="xp-titlebar" id="notepadWindowHeader">
+        <span>Untitled - Notepad</span>
+        <div class="xp-controls">
+          <div class="xp-btn-ctrl xp-btn-close" onclick="WindowManager.close('notepadWindow')">✕</div>
+        </div>
+      </div>
+      <div class="xp-body" style="padding: 0;">
+        <textarea style="width: 100%; height: 100%; border: none; outline: none; padding: 4px; font-family: monospace;"></textarea>
+      </div>
+    </div>
+
+    <!-- START MENU -->
+    <div id="startMenu">
+      <div class="start-header">
+        <i class="fas fa-user-circle" style="font-size: 24px;"></i>
+        <span id="startMenuUsername">XP User</span>
+      </div>
+      <div class="start-item" onclick="WindowManager.openOrRestore('appWindow'); closeStartMenu();"><i class="fab fa-replyd" style="color: #ff9900;"></i> MSN Messenger</div>
+      <div class="start-item" onclick="WindowManager.openOrRestore('winampContainerWindow'); closeStartMenu();"><i class="fas fa-bolt" style="color: #ffcc00;"></i> Winamp 2.8</div>
+      <div class="start-item" onclick="WindowManager.openOrRestore('displaySettingsWindow'); closeStartMenu();"><i class="fas fa-tv" style="color: #00ffcc;"></i> Display Settings</div>
+      <div class="start-item" onclick="WindowManager.openOrRestore('minesweeperWindow'); closeStartMenu();"><i class="fas fa-bomb" style="color: #ff4444;"></i> Minesweeper</div>
+      <div class="start-item" onclick="WindowManager.openOrRestore('notepadWindow'); closeStartMenu();"><i class="fas fa-file-alt"></i> Notepad</div>
+    </div>
+
+    <!-- TASKBAR -->
+    <div id="taskbar">
+      <div class="xp-start-btn" onclick="toggleStartMenu(event)"><i class="fab fa-windows"></i> start</div>
+      <div class="taskbar-items" id="taskbarItems"></div>
+      <div class="system-tray">
+        <i class="fas fa-volume-up"></i>
+        <i class="fab fa-replyd"></i>
+        <span id="trayClock">12:00 PM</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Profile Modal -->
+<div id="profileModal" class="xp-modal hidden">
+  <div class="modal-content">
+    <div class="modal-header">
+      <span>MSN Messenger Profile</span>
+      <div class="xp-btn-ctrl xp-btn-close" onclick="closeProfileModal()">✕</div>
+    </div>
+    <div class="modal-body" style="display: flex; flex-direction: column; gap: 8px;">
+      <div>
+        <label style="font-weight: bold; font-size: 11px;">Persistent User ID (Share for DMs):</label>
+        <input type="text" id="modalUserIdInput" class="xp-input" readonly style="background: #f0f0f0;">
+      </div>
+      <div>
+        <label style="font-weight: bold; font-size: 11px;">Nickname:</label>
+        <input type="text" id="modalUsernameInput" class="xp-input">
+      </div>
+      <div>
+        <label style="font-weight: bold; font-size: 11px;">Display Picture (Image / GIF):</label>
+        <input type="file" accept="image/*,.gif" class="xp-input" id="profileAvatarUpload">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="xp-button" onclick="saveProfileModal()">Save & Backup</button>
+    </div>
+  </div>
+</div>
+
+<!-- Include Modular Scripts -->
+<script src="winamp.js"></script>
+<script src="msn_messenger.js"></script>
+
+<script>
+// ==========================================
+// CENTRAL OS ORCHESTRATOR & WINDOW MANAGER
+// ==========================================
+let zIndexCounter = 200;
+let activeWindowId = 'appWindow';
+
+const windowsRegistry = {
+  appWindow: { id: 'appWindow', title: 'MSN Messenger', icon: 'fab fa-replyd', isOpen: true, isMinimized: false, isMaximized: false, canResize: true, canMaximize: true, minW: 360, minH: 260, restoreRect: { top: 25, left: 25, width: 920, height: 620 } },
+  winampContainerWindow: { id: 'winampContainerWindow', title: 'Winamp 2.80', icon: 'fas fa-bolt', isOpen: true, isMinimized: false, isMaximized: false, canResize: false, canMaximize: false, restoreRect: { top: 30, left: window.innerWidth - 295, width: 275, height: 400 } },
+  displaySettingsWindow: { id: 'displaySettingsWindow', title: 'CRT Properties', icon: 'fas fa-tv', isOpen: false, isMinimized: false, isMaximized: false, canResize: true, canMaximize: false, minW: 300, minH: 200, restoreRect: { top: 80, left: 100, width: 360, height: 340 } },
+  minesweeperWindow: { id: 'minesweeperWindow', title: 'Minesweeper', icon: 'fas fa-bomb', isOpen: false, isMinimized: false, isMaximized: false, canResize: false, canMaximize: false, restoreRect: { top: 100, left: 160, width: 200, height: 240 } },
+  notepadWindow: { id: 'notepadWindow', title: 'Notepad', icon: 'fas fa-file-alt', isOpen: false, isMinimized: false, isMaximized: false, canResize: true, canMaximize: true, minW: 240, minH: 160, restoreRect: { top: 120, left: 200, width: 320, height: 240 } }
+};
+
+const WindowManager = {
+  activate(id) {
+    const meta = windowsRegistry[id];
+    const el = document.getElementById(id);
+    if (!meta || !el || !meta.isOpen) return;
+
+    if (meta.isMinimized) {
+      meta.isMinimized = false;
+      el.classList.remove('hidden');
+    }
+
+    zIndexCounter += 2;
+    el.style.zIndex = zIndexCounter;
+
+    Object.keys(windowsRegistry).forEach(otherId => {
+      const oEl = document.getElementById(otherId);
+      if (oEl) oEl.classList.add('inactive');
+    });
+
+    el.classList.remove('inactive');
+    activeWindowId = id;
+    this.updateTaskbar();
+  },
+
+  openOrRestore(id) {
+    const meta = windowsRegistry[id];
+    const el = document.getElementById(id);
+    if (!meta || !el) return;
+
+    meta.isOpen = true;
+    meta.isMinimized = false;
+    el.classList.remove('hidden');
+    this.activate(id);
+  },
+
+  minimize(id) {
+    const meta = windowsRegistry[id];
+    const el = document.getElementById(id);
+    if (!meta || !el) return;
+
+    meta.isMinimized = true;
+    el.classList.add('hidden');
+
+    if (activeWindowId === id) {
+      activeWindowId = null;
+    }
+    this.updateTaskbar();
+  },
+
+  close(id) {
+    const meta = windowsRegistry[id];
+    const el = document.getElementById(id);
+    if (!meta || !el) return;
+
+    meta.isOpen = false;
+    meta.isMinimized = false;
+    el.classList.add('hidden');
+
+    if (activeWindowId === id) activeWindowId = null;
+    this.updateTaskbar();
+  },
+
+  toggleMaximize(id) {
+    const meta = windowsRegistry[id];
+    const el = document.getElementById(id);
+    if (!meta || !el || !meta.canMaximize) return;
+
+    const btn = document.getElementById(`${id}MaxBtn`);
+    if (meta.isMaximized) {
+      el.classList.remove('window-maximized');
+      el.style.top = `${meta.restoreRect.top}px`;
+      el.style.left = `${meta.restoreRect.left}px`;
+      el.style.width = `${meta.restoreRect.width}px`;
+      el.style.height = `${meta.restoreRect.height}px`;
+      meta.isMaximized = false;
+      if (btn) btn.innerHTML = '□';
+    } else {
+      meta.restoreRect = { top: el.offsetTop, left: el.offsetLeft, width: el.offsetWidth, height: el.offsetHeight };
+      el.classList.add('window-maximized');
+      meta.isMaximized = true;
+      if (btn) btn.innerHTML = '❐';
+    }
+    this.activate(id);
+  },
+
+  updateTaskbar() {
+    const container = document.getElementById('taskbarItems');
+    if (!container) return;
+    container.innerHTML = '';
+
+    Object.keys(windowsRegistry).forEach(winId => {
+      const meta = windowsRegistry[winId];
+      if (meta.isOpen) {
+        const tab = document.createElement('div');
+        const isActive = (activeWindowId === winId && !meta.isMinimized);
+        tab.className = `taskbar-tab ${isActive ? 'active' : ''}`;
+        tab.innerHTML = `<i class="${meta.icon}"></i> <span>${meta.title}</span>`;
+
+        tab.onclick = (e) => {
+          e.stopPropagation();
+          closeStartMenu();
+          if (isActive) {
+            this.minimize(winId);
+          } else {
+            this.openOrRestore(winId);
+          }
+        };
+        container.appendChild(tab);
+      }
+    });
+  }
+};
+
+// Pointer-captured Dragging & 8-Way Resizing
+function setupWindowInteractions() {
+  Object.keys(windowsRegistry).forEach(winId => {
+    const meta = windowsRegistry[winId];
+    const winEl = document.getElementById(winId);
+    if (!winEl) return;
+
+    winEl.addEventListener('pointerdown', () => WindowManager.activate(winId));
+
+    // Dragging
+    const titlebar = winEl.querySelector('.xp-titlebar') || winEl.querySelector('.wa-titlebar');
+    if (titlebar) {
+      titlebar.addEventListener('pointerdown', (e) => {
+        if (e.target.classList.contains('xp-btn-ctrl') || e.target.classList.contains('wa-title-btn')) return;
+        if (meta.isMaximized) return;
+
+        titlebar.setPointerCapture(e.pointerId);
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const initialL = winEl.offsetLeft;
+        const initialT = winEl.offsetTop;
+
+        function onPointerMove(ev) {
+          const newL = initialL + (ev.clientX - startX);
+          const newT = Math.max(0, Math.min(window.innerHeight - 50, initialT + (ev.clientY - startY)));
+          winEl.style.left = `${newL}px`;
+          winEl.style.top = `${newT}px`;
+        }
+
+        function onPointerUp(ev) {
+          titlebar.releasePointerCapture(ev.pointerId);
+          titlebar.removeEventListener('pointermove', onPointerMove);
+          titlebar.removeEventListener('pointerup', onPointerUp);
+        }
+
+        titlebar.addEventListener('pointermove', onPointerMove);
+        titlebar.addEventListener('pointerup', onPointerUp);
+      });
+    }
+
+    // 8-Directional Resizing
+    if (meta.canResize) {
+      ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'].forEach(dir => {
+        const handle = document.createElement('div');
+        handle.className = `rh rh-${dir}`;
+        winEl.appendChild(handle);
+
+        handle.addEventListener('pointerdown', (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          if (meta.isMaximized) return;
+
+          handle.setPointerCapture(e.pointerId);
+          const startX = e.clientX;
+          const startY = e.clientY;
+          const startW = winEl.offsetWidth;
+          const startH = winEl.offsetHeight;
+          const startL = winEl.offsetLeft;
+          const startT = winEl.offsetTop;
+
+          function onPointerMove(ev) {
+            const dx = ev.clientX - startX;
+            const dy = ev.clientY - startY;
+
+            if (dir.includes('e')) winEl.style.width = `${Math.max(meta.minW, startW + dx)}px`;
+            if (dir.includes('s')) winEl.style.height = `${Math.max(meta.minH, startH + dy)}px`;
+            if (dir.includes('w')) {
+              const newW = Math.max(meta.minW, startW - dx);
+              if (newW > meta.minW) { winEl.style.width = `${newW}px`; winEl.style.left = `${startL + dx}px`; }
+            }
+            if (dir.includes('n')) {
+              const newH = Math.max(meta.minH, startH - dy);
+              if (newH > meta.minH) { winEl.style.height = `${newH}px`; winEl.style.top = `${startT + dy}px`; }
+            }
+          }
+
+          function onPointerUp(ev) {
+            handle.releasePointerCapture(ev.pointerId);
+            handle.removeEventListener('pointermove', onPointerMove);
+            handle.removeEventListener('pointerup', onPointerUp);
+          }
+
+          handle.addEventListener('pointermove', onPointerMove);
+          handle.addEventListener('pointerup', onPointerUp);
+        });
+      });
+    }
+  });
+}
+
+function handleDesktopClick(e) {
+  if (e.target.id === 'desktop') {
+    Object.keys(windowsRegistry).forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.add('inactive');
+    });
+    activeWindowId = null;
+    WindowManager.updateTaskbar();
+    closeStartMenu();
+  }
+}
+
+// Tab Switching inside MSN
+function showGroupsTab() {
+  document.getElementById('groupList').classList.remove('hidden');
+  document.getElementById('groupControls').classList.remove('hidden');
+  document.getElementById('dmList').classList.add('hidden');
+  document.getElementById('dmControls').classList.add('hidden');
+  document.getElementById('groupTab').classList.add('active');
+  document.getElementById('dmTab').classList.remove('active');
+}
+
+function showDMsTab() {
+  document.getElementById('groupList').classList.add('hidden');
+  document.getElementById('groupControls').classList.add('hidden');
+  document.getElementById('dmList').classList.remove('hidden');
+  document.getElementById('dmControls').classList.remove('hidden');
+  document.getElementById('groupTab').classList.remove('active');
+  document.getElementById('dmTab').classList.add('active');
+}
+
+function toggleStartMenu(e) {
+  if (e) e.stopPropagation();
+  const m = document.getElementById('startMenu');
+  m.style.display = m.style.display === 'flex' ? 'none' : 'flex';
+}
+
+function closeStartMenu() {
+  document.getElementById('startMenu').style.display = 'none';
+}
+
+function openProfileModal() {
+  document.getElementById('modalUserIdInput').value = FirebaseSync.getUserState().userId;
+  document.getElementById('modalUsernameInput').value = FirebaseSync.getUserState().username;
+  document.getElementById('profileModal').classList.remove('hidden');
+}
+
+function closeProfileModal() {
+  document.getElementById('profileModal').classList.add('hidden');
+}
+
+function saveProfileModal() {
+  const name = document.getElementById('modalUsernameInput').value.trim();
+  const file = document.getElementById('profileAvatarUpload').files[0];
+
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      MSNMessenger.updateProfile(name, reader.result);
+      closeProfileModal();
+    };
+    reader.readAsDataURL(file);
+  } else {
+    MSNMessenger.updateProfile(name, null);
+    closeProfileModal();
+  }
+}
+
+function showSecurityInfo() {
+  alert("MSN ChitChat Enclave:\n• PBKDF2 100,000 SHA-256 iterations\n• AES-256-GCM symmetric authentication\n• Direct-message Nudges\n• Firebase Cloud backup for files & user settings");
+}
+
+// ==========================================
+// FIREBASE PERSISTENCE & USER SYNC
+// ==========================================
+const FirebaseSync = (function() {
+  const firebaseConfig = {
+    apiKey: "AIzaSyCqobhf4HFUdBIZJMF-s9uW3e0-EGh327I",
+    authDomain: "anonymous-chatting-c6712.firebaseapp.com",
+    databaseURL: "https://anonymous-chatting-c6712-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "anonymous-chatting-c6712",
+    storageBucket: "anonymous-chatting-c6712.appspot.com",
+    messagingSenderId: "124331866043",
+    appId: "1:124331866043:web:8be37be9d84974b4a0b69e"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  let local = JSON.parse(localStorage.getItem('userData')) || {};
+  let userState = {
+    userId: local.userId || (Math.random().toString(36).substring(2) + Date.now().toString(36)),
+    username: local.username || ('XP_Buddy_' + Math.floor(Math.random() * 1000)),
+    avatar: local.avatar || null,
+    wallpaper: local.wallpaper || null,
+    joinedGroups: local.joinedGroups || [],
+    groupPasswords: local.groupPasswords || {},
+    startedDMs: local.startedDMs || []
+  };
+
+  function init() {
+    // Restore saved settings from Firebase
+    db.ref(`users/${userState.userId}/config`).once('value', snap => {
+      const remote = snap.val();
+      if (remote) {
+        Object.assign(userState, remote);
+        localStorage.setItem('userData', JSON.stringify(userState));
+        if (userState.wallpaper) {
+          document.getElementById('desktop').style.background = `url("${userState.wallpaper}") center/cover no-repeat`;
+        }
+        if (remote.savedSongs && window.WinampPlayer) {
+          window.WinampPlayer.restoreSongs(remote.savedSongs);
+        }
+      }
+    });
+
+    if (userState.wallpaper) {
+      document.getElementById('desktop').style.background = `url("${userState.wallpaper}") center/cover no-repeat`;
+    }
+  }
+
+  function backupUserConfig(payload) {
+    db.ref(`users/${userState.userId}/config`).update(payload);
+  }
+
+  function backupSongs(songs) {
+    db.ref(`users/${userState.userId}/config/savedSongs`).set(songs);
+  }
+
+  function setWallpaper(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      userState.wallpaper = reader.result;
+      document.getElementById('desktop').style.background = `url("${reader.result}") center/cover no-repeat`;
+      backupUserConfig({ wallpaper: reader.result });
+      localStorage.setItem('userData', JSON.stringify(userState));
+    };
+    reader.readAsDataURL(file);
+  }
+
+  return {
+    init,
+    getDb: () => db,
+    getUserState: () => userState,
+    backupUserConfig,
+    backupSongs,
+    setWallpaper
+  };
+})();
+
+// System Clock
+function updateClock() {
+  const d = new Date();
+  let h = d.getHours();
+  const m = d.getMinutes().toString().padStart(2, '0');
+  const ap = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  document.getElementById('trayClock').innerText = `${h}:${m} ${ap}`;
+}
+
+window.onload = function() {
+  updateClock();
+  setInterval(updateClock, 1000);
+
+  FirebaseSync.init();
+  MSNMessenger.init(FirebaseSync.getDb(), FirebaseSync.getUserState());
+  WinampPlayer.init();
+
+  setupWindowInteractions();
+  WindowManager.updateTaskbar();
+};
+</script>
+</body>
+</html>
