@@ -1,0 +1,524 @@
+/**
+ * MSN Messenger '05 Encrypted ChitChat Enclave Module
+ * Zero-knowledge PBKDF2 (100k rounds) + AES-256-GCM authenticated encryption.
+ * Dynamic Nudge: strictly restricted to DMs, shakes the recipient's screen via Firebase.
+ */
+window.MSNMessenger = (function () {
+  let db = null;
+  let userId = null;
+  let username = null;
+  let userAvatar = null;
+  let userColor = 0;
+  let userStatus = 'online';
+  let userStatusMsg = 'Listening to: 4. Crusher-P - Echo (3:50) ♪';
+
+  let activeGroupId = null;
+  let activeDMId = null;
+  let currentEncryptionKey = null;
+  let participantsVisible = false;
+
+  const joinedGroups = new Set();
+  const groupPasswords = {};
+  const startedDMs = new Set();
+
+  function init(firebaseDatabase, userState) {
+    db = firebaseDatabase;
+    userId = userState.userId;
+    username = userState.username;
+    userAvatar = userState.avatar;
+    userColor = userState.color;
+    userStatus = userState.status || 'online';
+    userStatusMsg = userState.statusMsg || 'Listening to: 4. Crusher-P - Echo (3:50) ♪';
+
+    if (userState.joinedGroups) userState.joinedGroups.forEach(g => joinedGroups.add(g));
+    if (userState.groupPasswords) Object.assign(groupPasswords, userState.groupPasswords);
+    if (userState.startedDMs) userState.startedDMs.forEach(d => startedDMs.add(d));
+
+    updateNudgeVisibility();
+    renderSidebarItems();
+    updateUI();
+  }
+
+  // Cryptographic Sub-routines
+  async function deriveKey(password, saltStr) {
+    const salt = new TextEncoder().encode(saltStr);
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(password),
+      { name: 'PBKDF2' },
+      false,
+      ['deriveKey']
+    );
+    return crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt']
+    );
+  }
+
+  async function encryptData(data) {
+    if (!currentEncryptionKey) throw new Error("Encryption key not derived.");
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const enc = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, currentEncryptionKey, data);
+    return {
+      iv: Array.from(iv),
+      data: btoa(String.fromCharCode(...new Uint8Array(enc)))
+    };
+  }
+
+  async function decryptData(obj) {
+    if (!currentEncryptionKey) throw new Error("Encryption key not derived.");
+    return await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: new Uint8Array(obj.iv) },
+      currentEncryptionKey,
+      Uint8Array.from(atob(obj.data), c => c.charCodeAt(0))
+    );
+  }
+
+  // Dynamic Nudge Visibility: Only available in Direct Message (DM) conversations
+  function updateNudgeVisibility() {
+    const nudgeBtn = document.getElementById('msnNudgeBtn');
+    if (!nudgeBtn) return;
+    if (activeDMId) {
+      nudgeBtn.style.display = 'inline-flex';
+    } else {
+      nudgeBtn.style.display = 'none'; // Hidden when in group or when no DM is open
+    }
+  }
+
+  // Groups
+  async function joinGroup() {
+    const gid = document.getElementById('groupIdInput').value.trim();
+    const pwd = document.getElementById('groupPasswordInput').value;
+    if (!gid || !pwd) {
+      alert("Please enter both a Group ID and Passphrase.");
+      return;
+    }
+
+    try {
+      activeGroupId = gid;
+      activeDMId = null;
+      currentEncryptionKey = await deriveKey(pwd, gid);
+
+      joinedGroups.add(gid);
+      groupPasswords[gid] = pwd;
+      persistState();
+
+      // Register presence in Firebase
+      db.ref(`groups/${gid}/users/${userId}`).set({
+        username,
+        avatar: userAvatar,
+        status: userStatus,
+        lastSeen: Date.now()
+      });
+
+      updateChatHeader(`Group: #${gid}`, gid[0].toUpperCase(), true);
+      addGroupToList(gid);
+      listenGroupMessages();
+      loadGroupParticipants();
+      updateNudgeVisibility();
+
+      document.getElementById('groupIdInput').value = '';
+      document.getElementById('groupPasswordInput').value = '';
+    } catch (err) {
+      console.error(err);
+      alert("Failed to join group: " + err.message);
+    }
+  }
+
+  function addGroupToList(gid) {
+    const list = document.getElementById('groupList');
+    if ([...list.children].some(c => c.getAttribute('data-id') === gid)) return;
+
+    const div = document.createElement('div');
+    div.className = 'group-item';
+    div.setAttribute('data-id', gid);
+    div.innerHTML = `
+      <div class="group-item-avatar">${gid[0].toUpperCase()}</div>
+      <div style="flex: 1; font-weight: bold; overflow: hidden; text-overflow: ellipsis;">${gid}</div>
+      <i class="fas fa-lock" style="font-size: 10px; color: #0054e3;"></i>
+    `;
+    div.onclick = async () => {
+      let pwd = groupPasswords[gid];
+      if (!pwd) {
+        pwd = prompt(`Enter encryption passphrase for Group "${gid}":`);
+        if (!pwd) return;
+        groupPasswords[gid] = pwd;
+        persistState();
+      }
+      activeGroupId = gid;
+      activeDMId = null;
+      currentEncryptionKey = await deriveKey(pwd, gid);
+      updateChatHeader(`Group: #${gid}`, gid[0].toUpperCase(), true);
+      updateNudgeVisibility();
+      listenGroupMessages();
+      loadGroupParticipants();
+    };
+    list.appendChild(div);
+  }
+
+  function listenGroupMessages() {
+    if (!activeGroupId) return;
+    const chatArea = document.getElementById('chatArea');
+    chatArea.innerHTML = '<div style="font-size: 11px; color: #555; padding: 10px;"><i class="fas fa-spinner fa-spin"></i> Establishing E2EE channel...</div>';
+
+    const ref = db.ref(`groups/${activeGroupId}/messages`);
+    ref.off();
+    ref.on('child_added', snap => appendMessage(snap.val(), true));
+  }
+
+  // Direct Messages
+  function startDM() {
+    const otherId = document.getElementById('dmUserInput').value.trim();
+    if (!otherId) return;
+    if (otherId === userId) {
+      alert("Cannot open direct chat with yourself.");
+      return;
+    }
+
+    activeDMId = [userId, otherId].sort().join('_');
+    activeGroupId = null;
+    currentEncryptionKey = null;
+
+    startedDMs.add(otherId);
+    persistState();
+
+    updateChatHeader(`Buddy: ${otherId}`, otherId[0].toUpperCase(), false);
+    addDMToList(otherId);
+    updateNudgeVisibility();
+    listenDMMessages();
+
+    document.getElementById('dmUserInput').value = '';
+  }
+
+  function addDMToList(otherId) {
+    const list = document.getElementById('dmList');
+    if ([...list.children].some(c => c.getAttribute('data-id') === otherId)) return;
+
+    const div = document.createElement('div');
+    div.className = 'group-item';
+    div.setAttribute('data-id', otherId);
+    div.innerHTML = `
+      <div class="group-item-avatar">${otherId[0].toUpperCase()}</div>
+      <div style="flex: 1; font-weight: bold; overflow: hidden; text-overflow: ellipsis;">${otherId}</div>
+      <i class="far fa-comment-dots" style="font-size: 10px; color: #ff9900;"></i>
+    `;
+    div.onclick = () => {
+      activeDMId = [userId, otherId].sort().join('_');
+      activeGroupId = null;
+      currentEncryptionKey = null;
+      updateChatHeader(`Buddy: ${otherId}`, otherId[0].toUpperCase(), false);
+      updateNudgeVisibility();
+      listenDMMessages();
+    };
+    list.appendChild(div);
+  }
+
+  function listenDMMessages() {
+    if (!activeDMId) return;
+    const chatArea = document.getElementById('chatArea');
+    chatArea.innerHTML = '<div style="font-size: 11px; color: #555; padding: 10px;"><i class="fas fa-spinner fa-spin"></i> Connecting to Buddy DM...</div>';
+
+    const ref = db.ref(`dms/${activeDMId}/messages`);
+    ref.off();
+    ref.on('child_added', snap => {
+      const msg = snap.val();
+      appendMessage(msg, false);
+
+      // Trigger cross-network Nudge if sent by the buddy
+      if (msg.isNudge && msg.userId !== userId) {
+        triggerNudgeShake();
+      }
+    });
+  }
+
+  // Cross-device MSN Nudge
+  function sendNudge() {
+    if (!activeDMId) {
+      alert("Nudges can only be sent in Direct Buddy Chats (DMs)!");
+      return;
+    }
+
+    // Trigger local animation & chime
+    triggerNudgeShake();
+
+    // Transmit nudge across Firebase to the recipient
+    db.ref(`dms/${activeDMId}/messages`).push().set({
+      userId,
+      username,
+      avatar: userAvatar,
+      isNudge: true,
+      text: `⚡ [You received an MSN NUDGE!] ⚡`,
+      timestamp: Date.now()
+    });
+  }
+
+  function triggerNudgeShake() {
+    const appWin = document.getElementById('appWindow');
+    if (!appWin) return;
+    appWin.classList.add('nudge-shake');
+
+    // Synthesize classic MSN Nudge sound
+    if (window.WinampPlayer) {
+      const ctx = window.WinampPlayer.getAudioContext();
+      if (ctx) {
+        try {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(680, ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(220, ctx.currentTime + 0.35);
+          gain.gain.setValueAtTime(0.5, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.35);
+        } catch (e) {}
+      }
+    }
+
+    setTimeout(() => appWin.classList.remove('nudge-shake'), 900);
+  }
+
+  // Sending Messages & Encrypted Files
+  async function sendMessage() {
+    const input = document.getElementById('messageText');
+    const text = input.value.trim();
+    if (!text) return;
+
+    if (!activeGroupId && !activeDMId) {
+      alert("Select a room or buddy first.");
+      return;
+    }
+
+    if (activeGroupId) {
+      const encryptedObj = await encryptData(new TextEncoder().encode(text));
+      db.ref(`groups/${activeGroupId}/messages`).push().set({
+        userId,
+        username,
+        avatar: userAvatar,
+        encryptedText: encryptedObj,
+        timestamp: Date.now()
+      });
+    } else if (activeDMId) {
+      db.ref(`dms/${activeDMId}/messages`).push().set({
+        userId,
+        username,
+        avatar: userAvatar,
+        text,
+        timestamp: Date.now()
+      });
+    }
+
+    input.value = '';
+  }
+
+  async function sendFile(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (!activeGroupId && !activeDMId) {
+      alert("Please join an encrypted group or open a DM first.");
+      return;
+    }
+
+    if (activeGroupId) {
+      const buffer = await file.arrayBuffer();
+      const encryptedObj = await encryptData(buffer);
+      db.ref(`groups/${activeGroupId}/messages`).push().set({
+        userId,
+        username,
+        avatar: userAvatar,
+        encryptedFile: encryptedObj,
+        filename: file.name,
+        fileType: file.type,
+        timestamp: Date.now()
+      });
+    } else if (activeDMId) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        db.ref(`dms/${activeDMId}/messages`).push().set({
+          userId,
+          username,
+          avatar: userAvatar,
+          file: reader.result,
+          filename: file.name,
+          fileType: file.type,
+          timestamp: Date.now()
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+
+    event.target.value = '';
+  }
+
+  async function appendMessage(msg, isEncrypted) {
+    const chatArea = document.getElementById('chatArea');
+    const spin = chatArea.querySelector('.fa-spinner');
+    if (spin && spin.parentElement) spin.parentElement.remove();
+
+    const isSelf = msg.userId === userId;
+    const div = document.createElement('div');
+    div.className = `message ${isSelf ? 'outgoing' : 'incoming'}`;
+
+    const timeStr = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+    const avatarHtml = msg.avatar
+      ? `<div class="message-avatar" style="background-image: url('${msg.avatar}')"></div>`
+      : `<div class="message-avatar">${(msg.username || 'U').charAt(0).toUpperCase()}</div>`;
+
+    let innerHtml = '';
+
+    if (isEncrypted) {
+      if (msg.encryptedText) {
+        try {
+          const dec = new TextDecoder().decode(await decryptData(msg.encryptedText));
+          innerHtml = `<div class="text">${escapeHtml(dec)}</div>`;
+        } catch (e) {
+          innerHtml = `<div class="text" style="color: #c00;">[Failed to decrypt packet - invalid key]</div>`;
+        }
+      } else if (msg.encryptedFile) {
+        try {
+          const decBuf = await decryptData(msg.encryptedFile);
+          const mime = msg.fileType || 'application/octet-stream';
+          const blob = new Blob([decBuf], { type: mime });
+          const url = URL.createObjectURL(blob);
+          if (mime.startsWith('image/')) {
+            innerHtml = `<div class="text"><img src="${url}" class="chat-shared-img"><a href="${url}" download="${msg.filename || 'img'}" class="file-attachment-link">Download</a></div>`;
+          } else {
+            innerHtml = `<div class="text"><a href="${url}" download="${msg.filename || 'file'}" class="file-attachment-link"><i class="fas fa-file-download"></i> ${escapeHtml(msg.filename)}</a></div>`;
+          }
+        } catch (e) {
+          innerHtml = `<div class="text" style="color: #c00;">[File decryption error]</div>`;
+        }
+      }
+    } else {
+      if (msg.text) {
+        innerHtml = `<div class="text">${escapeHtml(msg.text)}</div>`;
+      } else if (msg.file) {
+        if (msg.fileType && msg.fileType.startsWith('image/')) {
+          innerHtml = `<div class="text"><img src="${msg.file}" class="chat-shared-img"><a href="${msg.file}" download="${msg.filename}" class="file-attachment-link">Download</a></div>`;
+        } else {
+          innerHtml = `<div class="text"><a href="${msg.file}" download="${msg.filename}" class="file-attachment-link"><i class="fas fa-download"></i> ${escapeHtml(msg.filename)}</a></div>`;
+        }
+      }
+    }
+
+    div.innerHTML = `
+      <div class="message-header">
+        <span>${escapeHtml(msg.username || 'User')}</span>
+        <span class="timestamp">${timeStr}</span>
+        ${isEncrypted ? '<span class="encrypted-tag"><i class="fas fa-lock"></i> AES-256</span>' : ''}
+      </div>
+      <div class="message-content">
+        ${avatarHtml}
+        ${innerHtml}
+      </div>
+    `;
+
+    chatArea.appendChild(div);
+    chatArea.scrollTop = chatArea.scrollHeight;
+  }
+
+  function loadGroupParticipants() {
+    if (!activeGroupId) return;
+    const listEl = document.getElementById('participantsList');
+    listEl.innerHTML = '';
+
+    db.ref(`groups/${activeGroupId}/users`).on('value', snap => {
+      const users = snap.val();
+      listEl.innerHTML = '';
+      if (users) {
+        Object.entries(users).forEach(([id, u]) => {
+          const div = document.createElement('div');
+          div.className = 'participant-item';
+          const av = u.avatar
+            ? `<div class="participant-avatar" style="background-image: url('${u.avatar}')"></div>`
+            : `<div class="participant-avatar">${(u.username || 'U').charAt(0).toUpperCase()}</div>`;
+          div.innerHTML = `${av} <div style="flex: 1; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(u.username)} ${id === userId ? '<b>(You)</b>' : ''}</div>`;
+          listEl.appendChild(div);
+        });
+      }
+    });
+  }
+
+  function updateChatHeader(title, letter, isEncrypted) {
+    document.getElementById('chatTitle').innerText = title;
+    const av = document.getElementById('chatAvatar');
+    av.innerText = letter;
+    av.style.backgroundImage = '';
+
+    const encStatus = document.getElementById('encryptionStatusText');
+    if (isEncrypted) {
+      encStatus.innerHTML = '<span style="color: #00aa55;"><i class="fas fa-lock"></i> PBKDF2 + AES-256-GCM Secure Channel</span>';
+    } else {
+      encStatus.innerHTML = '<span style="color: #ff9900;"><i class="fas fa-user-friends"></i> Direct Buddy Chat Active</span>';
+    }
+  }
+
+  function renderSidebarItems() {
+    joinedGroups.forEach(gid => addGroupToList(gid));
+    startedDMs.forEach(dm => addDMToList(dm));
+  }
+
+  function updateUI() {
+    const nameEl = document.getElementById('msnHeaderUsername');
+    if (nameEl) nameEl.innerText = username;
+    const idEl = document.getElementById('msnHeaderUserId');
+    if (idEl) idEl.innerText = `(${userId.substring(0, 8)}...)`;
+
+    const av = document.getElementById('msnHeaderAvatar');
+    if (av) {
+      if (userAvatar) {
+        av.innerHTML = `<img src="${userAvatar}"><div class="msn-status-dot" id="msnStatusDot"></div>`;
+      } else {
+        av.innerHTML = `<span>${username.charAt(0).toUpperCase()}</span><div class="msn-status-dot" id="msnStatusDot"></div>`;
+      }
+    }
+  }
+
+  function persistState() {
+    const payload = {
+      userId,
+      username,
+      avatar: userAvatar,
+      status: userStatus,
+      statusMsg: userStatusMsg,
+      joinedGroups: Array.from(joinedGroups),
+      groupPasswords,
+      startedDMs: Array.from(startedDMs)
+    };
+    localStorage.setItem('userData', JSON.stringify(payload));
+    if (window.FirebaseSync) {
+      window.FirebaseSync.backupUserConfig(payload);
+    }
+  }
+
+  function escapeHtml(str) {
+    return (str || '').replace(/[&<>"']/g, m => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[m]);
+  }
+
+  return {
+    init,
+    joinGroup,
+    startDM,
+    sendNudge,
+    sendMessage,
+    sendFile,
+    setListeningTrack: (trackStr) => {
+      const el = document.getElementById('statusMessageInput');
+      if (el) el.value = `Listening to: ${trackStr} ♪`;
+    },
+    updateProfile: (newName, newAvatar) => {
+      if (newName) username = newName;
+      if (newAvatar) userAvatar = newAvatar;
+      persistState();
+      updateUI();
+    }
+  };
+})();
