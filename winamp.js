@@ -1,6 +1,11 @@
 /**
  * Winamp 2.80 Classic (Webamp-Exact Replica Module)
- * Faithful to Nullsoft Winamp 2.x & Jordan Eldredge's Webamp specifications.
+ * Exact recreation of Jordan Eldredge's Webamp & Nullsoft Winamp 2.x specifications:
+ *  - 28-step discrete red-to-green LED volume wedge
+ *  - Center-deadzone balance slider
+ *  - Gold metallic seek bar with embossed grip lines
+ *  - 10-band grooved EQ sliders with glowing neon-green center bar
+ *  - Catmull-Rom interpolated green spline visualizer
  */
 window.WinampPlayer = (function () {
   let audioCtx = null;
@@ -215,7 +220,6 @@ window.WinampPlayer = (function () {
     requestAnimationFrame(drawSpectrum);
   }
 
-  // Spline drawing with Catmull-Rom smoothing matching Nullsoft Winamp
   function drawEqSpline() {
     const canvas = document.getElementById('waEqSplineCanvas');
     if (!canvas) return;
@@ -235,7 +239,7 @@ window.WinampPlayer = (function () {
 
     ctx.beginPath();
     ctx.strokeStyle = '#00ff00';
-    ctx.lineWidth = 1.2;
+    ctx.lineWidth = 1.3;
 
     ctx.moveTo(points[0].x, points[0].y);
     for (let i = 0; i < points.length - 1; i++) {
