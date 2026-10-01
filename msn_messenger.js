@@ -35,9 +35,40 @@ window.MSNMessenger = (function () {
     updateUI();
   }
 
-  // Safe Firebase Key Sanitization (prevents path errors with '.', '#', '$', '[', ']')
+  // Safe Firebase Key Sanitization
   function sanitizePath(id) {
     return (id || '').replace(/[.#$\[\]\/]/g, '_').trim();
+  }
+
+  // Safe chunked ArrayBuffer <-> Base64 conversion (avoids V8 call stack size limit on large files)
+  function arrayBufferToBase64(buffer) {
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    const len = bytes.byteLength;
+    const chunkSize = 8192;
+    for (let i = 0; i < len; i += chunkSize) {
+      const chunk = bytes.subarray(i, Math.min(i + chunkSize, len));
+      binary += String.fromCharCode.apply(null, chunk);
+    }
+    return btoa(binary);
+  }
+
+  function base64ToArrayBuffer(base64) {
+    const binaryString = atob(base64);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes.buffer;
+  }
+
+  function formatBytes(bytes) {
+    if (!bytes || bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   }
 
   async function deriveKey(password, saltStr) {
@@ -64,20 +95,20 @@ window.MSNMessenger = (function () {
     const enc = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, currentEncryptionKey, data);
     return {
       iv: Array.from(iv),
-      data: btoa(String.fromCharCode(...new Uint8Array(enc)))
+      data: arrayBufferToBase64(enc)
     };
   }
 
   async function decryptData(obj) {
     if (!currentEncryptionKey) throw new Error("Encryption key not derived.");
+    const buf = base64ToArrayBuffer(obj.data);
     return await crypto.subtle.decrypt(
       { name: 'AES-GCM', iv: new Uint8Array(obj.iv) },
       currentEncryptionKey,
-      Uint8Array.from(atob(obj.data), c => c.charCodeAt(0))
+      buf
     );
   }
 
-  // Dynamic Nudge: Strictly visible in DMs, hidden in groups
   function updateNudgeVisibility() {
     const nudgeBtn = document.getElementById('msnNudgeBtn');
     if (!nudgeBtn) return;
@@ -88,7 +119,6 @@ window.MSNMessenger = (function () {
     }
   }
 
-  // Group Joining (Safely sanitized and error-handled)
   async function joinGroup() {
     const rawGid = document.getElementById('groupIdInput').value.trim();
     const pwd = document.getElementById('groupPasswordInput').value;
@@ -174,7 +204,6 @@ window.MSNMessenger = (function () {
     ref.on('child_added', snap => appendMessage(snap.val(), true));
   }
 
-  // Direct Buddy Messages
   function startDM() {
     const rawOtherId = document.getElementById('dmUserInput').value.trim();
     if (!rawOtherId) return;
@@ -240,7 +269,6 @@ window.MSNMessenger = (function () {
     });
   }
 
-  // Cross-Network MSN Nudge
   function sendNudge() {
     if (!activeDMId) {
       alert("Nudges are only available in Direct Buddy Chats (DMs)!");
@@ -320,44 +348,59 @@ window.MSNMessenger = (function () {
     input.value = '';
   }
 
+  // Robust file & image transmission with chunked conversion
   async function sendFile(event) {
     const file = event.target.files[0];
     if (!file) return;
 
     if (!activeGroupId && !activeDMId) {
-      alert("Join an encrypted group or open a DM first.");
+      alert("Please join an encrypted group or open a DM before sending files.");
       return;
     }
 
-    if (activeGroupId && db) {
-      const buffer = await file.arrayBuffer();
-      const encryptedObj = await encryptData(buffer);
-      db.ref(`groups/${activeGroupId}/messages`).push().set({
-        userId,
-        username,
-        avatar: userAvatar,
-        encryptedFile: encryptedObj,
-        filename: file.name,
-        fileType: file.type,
-        timestamp: Date.now()
-      });
-    } else if (activeDMId && db) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        db.ref(`dms/${activeDMId}/messages`).push().set({
+    // Guard against Firebase Realtime Database size overflow (> 6 MB)
+    if (file.size > 6 * 1024 * 1024) {
+      alert("File size exceeds 6 MB limit for Realtime Database transport. Please choose a smaller file.");
+      event.target.value = '';
+      return;
+    }
+
+    try {
+      if (activeGroupId && db) {
+        const buffer = await file.arrayBuffer();
+        const encryptedObj = await encryptData(buffer);
+        await db.ref(`groups/${activeGroupId}/messages`).push().set({
           userId,
           username,
           avatar: userAvatar,
-          file: reader.result,
+          encryptedFile: encryptedObj,
           filename: file.name,
-          fileType: file.type,
+          fileType: file.type || 'application/octet-stream',
+          fileSize: file.size,
           timestamp: Date.now()
         });
-      };
-      reader.readAsDataURL(file);
+      } else if (activeDMId && db) {
+        const reader = new FileReader();
+        reader.onload = async () => {
+          await db.ref(`dms/${activeDMId}/messages`).push().set({
+            userId,
+            username,
+            avatar: userAvatar,
+            file: reader.result,
+            filename: file.name,
+            fileType: file.type || 'application/octet-stream',
+            fileSize: file.size,
+            timestamp: Date.now()
+          });
+        };
+        reader.readAsDataURL(file);
+      }
+    } catch (err) {
+      console.error("Failed to send file:", err);
+      alert("Failed to send file: " + err.message);
+    } finally {
+      event.target.value = '';
     }
-
-    event.target.value = '';
   }
 
   async function appendMessage(msg, isEncrypted) {
@@ -391,22 +434,50 @@ window.MSNMessenger = (function () {
           const blob = new Blob([decBuf], { type: mime });
           const url = URL.createObjectURL(blob);
           if (mime.startsWith('image/')) {
-            innerHtml = `<div class="text"><img src="${url}" class="chat-shared-img"><a href="${url}" download="${msg.filename || 'img'}" class="file-attachment-link">Download</a></div>`;
+            innerHtml = `
+              <div class="text">
+                <div style="font-size: 11px; margin-bottom: 4px;"><i class="fas fa-image" style="color: #00aa55;"></i> ${escapeHtml(msg.filename)} (${formatBytes(msg.fileSize || decBuf.byteLength)})</div>
+                <a href="${url}" target="_blank" title="View Full Image">
+                  <img src="${url}" class="chat-shared-img" alt="${escapeHtml(msg.filename)}">
+                </a>
+                <a href="${url}" download="${msg.filename || 'image.png'}" class="file-attachment-link"><i class="fas fa-download"></i> Save Image</a>
+              </div>
+            `;
           } else {
-            innerHtml = `<div class="text"><a href="${url}" download="${msg.filename || 'file'}" class="file-attachment-link"><i class="fas fa-file-download"></i> ${escapeHtml(msg.filename)}</a></div>`;
+            innerHtml = `
+              <div class="text">
+                <div style="font-size: 11px; margin-bottom: 2px;"><i class="fas fa-file-alt"></i> ${escapeHtml(msg.filename)} (${formatBytes(msg.fileSize || decBuf.byteLength)})</div>
+                <a href="${url}" download="${msg.filename || 'file'}" class="file-attachment-link"><i class="fas fa-download"></i> Download File</a>
+              </div>
+            `;
           }
         } catch (e) {
-          innerHtml = `<div class="text" style="color: #c00;">[File decryption error]</div>`;
+          console.error("Decryption error:", e);
+          innerHtml = `<div class="text" style="color: #c00;">[File decryption error - invalid key]</div>`;
         }
       }
     } else {
       if (msg.text) {
         innerHtml = `<div class="text">${escapeHtml(msg.text)}</div>`;
       } else if (msg.file) {
-        if (msg.fileType && msg.fileType.startsWith('image/')) {
-          innerHtml = `<div class="text"><img src="${msg.file}" class="chat-shared-img"><a href="${msg.file}" download="${msg.filename}" class="file-attachment-link">Download</a></div>`;
+        const mime = msg.fileType || '';
+        if (mime.startsWith('image/') || (typeof msg.file === 'string' && msg.file.startsWith('data:image/'))) {
+          innerHtml = `
+            <div class="text">
+              <div style="font-size: 11px; margin-bottom: 4px;"><i class="fas fa-image" style="color: #00aa55;"></i> ${escapeHtml(msg.filename || 'Photo')} (${formatBytes(msg.fileSize)})</div>
+              <a href="${msg.file}" target="_blank" title="View Full Image">
+                <img src="${msg.file}" class="chat-shared-img" alt="${escapeHtml(msg.filename || 'Photo')}">
+              </a>
+              <a href="${msg.file}" download="${msg.filename || 'photo.png'}" class="file-attachment-link"><i class="fas fa-download"></i> Save Image</a>
+            </div>
+          `;
         } else {
-          innerHtml = `<div class="text"><a href="${msg.file}" download="${msg.filename}" class="file-attachment-link"><i class="fas fa-download"></i> ${escapeHtml(msg.filename)}</a></div>`;
+          innerHtml = `
+            <div class="text">
+              <div style="font-size: 11px; margin-bottom: 2px;"><i class="fas fa-file-alt"></i> ${escapeHtml(msg.filename || 'File')} (${formatBytes(msg.fileSize)})</div>
+              <a href="${msg.file}" download="${msg.filename || 'attachment'}" class="file-attachment-link"><i class="fas fa-download"></i> Download File</a>
+            </div>
+          `;
         }
       }
     }
