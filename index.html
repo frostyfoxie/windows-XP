@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Windows XP - MSN Messenger '05 & Winamp 2.8</title>
+<title>Windows XP</title>
 
 <!-- External Icon & Font Assets -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -22,9 +22,9 @@
   --digital-font: 'VT323', monospace;
   --desktop-bg: radial-gradient(circle at 70% 30%, rgba(144, 202, 249, 0.4) 0%, transparent 50%),
                 linear-gradient(to bottom, #1f62cb 0%, #2989d8 35%, #72b938 72%, #42821b 100%);
-  --crt-scanline-opacity: 0.35;
-  --crt-flicker-opacity: 0.04;
-  --crt-vignette-opacity: 0.6;
+  --crt-scanline-opacity: 0.28;
+  --crt-flicker-opacity: 0.03;
+  --crt-vignette-opacity: 0.55;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
@@ -46,23 +46,63 @@ body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--win
 .desktop-icon-badge { font-size: 32px; margin-bottom: 6px; width: 46px; height: 46px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); }
 .desktop-icon span { font-size: 11px; text-align: center; }
 
-/* Windows XP System Window */
-.xp-window { position: absolute; background: #f0f6fe; border: 3px solid #0054e3; border-top-left-radius: 8px; border-top-right-radius: 8px; box-shadow: 4px 6px 20px rgba(0,0,0,0.45); display: flex; flex-direction: column; z-index: 10; overflow: visible; }
-.xp-window.window-maximized { top: 0 !important; left: 0 !important; width: 100% !important; height: calc(100% - 32px) !important; border-radius: 0 !important; border: none !important; }
-.xp-window.inactive { border-color: #7b9ebd; box-shadow: 2px 4px 10px rgba(0,0,0,0.25); }
+/* Ultra-Smooth Windows XP Window Styling with GPU compositing */
+.xp-window {
+  position: absolute;
+  background: #f0f6fe;
+  border: 3px solid #0054e3;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+  box-shadow: 4px 6px 20px rgba(0,0,0,0.45);
+  display: flex;
+  flex-direction: column;
+  z-index: 10;
+  overflow: visible;
+  will-change: left, top, width, height;
+}
 
-.xp-titlebar { background: linear-gradient(to bottom, #0058ee 0%, #388efd 12%, #0054e3 85%, #002e80 100%); color: #ffffff; padding: 4px 8px; display: flex; align-items: center; justify-content: space-between; font-weight: bold; font-size: 12px; cursor: move; height: 30px; border-top-left-radius: 5px; border-top-right-radius: 5px; }
+.xp-window.window-maximized {
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: calc(100% - 32px) !important;
+  border-radius: 0 !important;
+  border: none !important;
+}
+
+.xp-window.inactive {
+  border-color: #7b9ebd;
+  box-shadow: 2px 4px 10px rgba(0,0,0,0.25);
+}
+
+.xp-titlebar {
+  background: linear-gradient(to bottom, #0058ee 0%, #388efd 12%, #0054e3 85%, #002e80 100%);
+  color: #ffffff;
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: bold;
+  font-size: 12px;
+  cursor: move;
+  height: 30px;
+  border-top-left-radius: 5px;
+  border-top-right-radius: 5px;
+  touch-action: none;
+}
+
 .xp-window.window-maximized .xp-titlebar { border-radius: 0; cursor: default; }
 .xp-window.inactive .xp-titlebar { background: linear-gradient(to bottom, #7a9cc6 0%, #a2b7cd 50%, #6e88a3 100%); color: #d8e2ed; }
 
 .xp-controls { display: flex; gap: 3px; align-items: center; }
 .xp-btn-ctrl { width: 21px; height: 21px; border-radius: 3px; border: 1px solid #ffffff; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; color: white; cursor: pointer; }
+.xp-btn-ctrl:hover { filter: brightness(1.15); }
 .xp-btn-minimize { background: linear-gradient(to bottom, #388efd, #0054e3); }
 .xp-btn-maximize { background: linear-gradient(to bottom, #388efd, #0054e3); }
 .xp-btn-close { background: linear-gradient(to bottom, #e76646, #c22f0e); border-color: #ffe6e0; }
 
 /* 8-Directional Window Resize Handles */
-.rh { position: absolute; z-index: 1000; }
+.rh { position: absolute; z-index: 1000; touch-action: none; }
 .rh-n { top: -6px; left: 10px; right: 10px; height: 10px; cursor: n-resize; }
 .rh-s { bottom: -6px; left: 10px; right: 10px; height: 10px; cursor: s-resize; }
 .rh-e { right: -6px; top: 10px; bottom: 10px; width: 10px; cursor: e-resize; }
@@ -73,7 +113,79 @@ body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--win
 .rh-se { bottom: -3px; right: -3px; width: 16px; height: 16px; cursor: se-resize; background: linear-gradient(135deg, transparent 50%, #444 50%); }
 .xp-window.window-maximized .rh { display: none !important; }
 
-/* MSN Header & Layout */
+/* ========================================================
+   AUTHENTIC WINDOWS XP LUNA DROPDOWN COMBOBOX (CUSTOM CSS)
+   ======================================================== */
+.xp-select-container {
+  position: relative;
+  display: inline-block;
+  font-family: var(--win-font);
+  font-size: 11px;
+}
+
+.xp-combobox {
+  display: flex;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #7f9db9;
+  border-radius: 2px;
+  cursor: pointer;
+  height: 22px;
+  padding-left: 6px;
+  box-shadow: inset 1px 1px 1px rgba(0,0,0,0.1);
+}
+
+.xp-combobox:hover { border-color: #316ac5; }
+
+.xp-combobox-text {
+  flex: 1;
+  color: #0f4073;
+  white-space: nowrap;
+  padding-right: 6px;
+}
+
+.xp-combobox-btn {
+  width: 17px;
+  height: 100%;
+  background: linear-gradient(to bottom, #dbeafc 0%, #b8d4f8 45%, #92bce3 55%, #c8e0fe 100%);
+  border-left: 1px solid #7f9db9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #000;
+  font-size: 8px;
+}
+
+.xp-combobox:hover .xp-combobox-btn {
+  background: linear-gradient(to bottom, #eaf3fe 0%, #cde1fa 50%, #a4caf0 100%);
+}
+
+.xp-combobox-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid #7f9db9;
+  box-shadow: 2px 3px 6px rgba(0,0,0,0.3);
+  z-index: 99999;
+  display: none;
+}
+
+.xp-combobox-dropdown.show { display: block; }
+
+.xp-combobox-option {
+  padding: 3px 6px;
+  cursor: pointer;
+  color: #000;
+}
+
+.xp-combobox-option:hover {
+  background: #316ac5;
+  color: #ffffff;
+}
+
+/* MSN Layout */
 .msn-user-header { background: linear-gradient(to bottom, #e3effd 0%, #c3ddf9 60%, #b2d3f7 100%); padding: 8px 12px; border-bottom: 1px solid #84aee0; display: flex; align-items: center; gap: 12px; }
 .msn-avatar-frame { width: 52px; height: 52px; border: 2px solid #ffffff; border-radius: 4px; background: #2b7bc6; display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; font-weight: bold; position: relative; cursor: pointer; overflow: hidden; }
 .msn-avatar-frame img { width: 100%; height: 100%; object-fit: cover; }
@@ -128,7 +240,7 @@ body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--win
 }
 
 /* =======================================================
-   WEBAMP-EXACT REPLICA GRADIENT SLIDERS (WINAMP 2.80)
+   WEBAMP REPLICA GRADIENT & EQUALIZER VERTICAL SLIDERS
    ======================================================= */
 #winampContainerWindow { width: 275px; z-index: 120; }
 .wa-window-panel { background: linear-gradient(to bottom, #30303c, #1e1e28); border: 2px solid #5d5d6d; box-shadow: inset 1px 1px 0 #7e7e8e, inset -1px -1px 0 #111; padding: 3px; display: flex; flex-direction: column; color: #00ff00; font-family: var(--digital-font); }
@@ -137,7 +249,6 @@ body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--win
 .wa-main-display { background: #000000; border: 1px solid #4a4a58; padding: 4px; display: flex; flex-direction: column; gap: 3px; }
 .wa-timer-digit { font-size: 30px; color: #00ff00; text-shadow: 0 0 8px #00ff00; line-height: 1; }
 
-/* Webamp Gradient Wedge Track for Volume & Balance */
 .wa-slider-wrap { position: relative; height: 13px; display: flex; align-items: center; flex: 1; }
 .wa-vol-wedge-track {
   width: 100%; height: 9px;
@@ -171,20 +282,8 @@ body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--win
   cursor: pointer;
 }
 
-/* Webamp Seek Bar: Classic Gold Metallic Thumb */
-.wa-seek-bar-track {
-  width: 100%; height: 10px;
-  background: #000;
-  border: 1px solid #3a3a46;
-  position: relative;
-}
-.wa-seek-slider {
-  -webkit-appearance: none;
-  width: 100%; height: 10px;
-  background: transparent;
-  outline: none;
-  position: absolute; top: 0; left: 0;
-}
+.wa-seek-bar-track { width: 100%; height: 10px; background: #000; border: 1px solid #3a3a46; position: relative; }
+.wa-seek-slider { -webkit-appearance: none; width: 100%; height: 10px; background: transparent; outline: none; position: absolute; top: 0; left: 0; }
 .wa-seek-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   width: 28px; height: 10px;
@@ -195,28 +294,48 @@ body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--win
   cursor: pointer;
 }
 
-/* Webamp Vertical EQ Sliders with Green Line Thumb */
+/* Discrete Grooved Vertical EQ Sliders with Neon Green Horizontal Bar */
+.wa-eq-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  width: 14px;
+}
+.wa-eq-slot-track {
+  position: absolute;
+  top: 0;
+  width: 4px;
+  height: 56px;
+  background: #000;
+  border: 1px solid #222;
+  box-shadow: inset 1px 1px 1px #000;
+  background-image: repeating-linear-gradient(180deg, #444 0px, #444 1px, transparent 1px, transparent 5px);
+}
 .wa-vert-slider {
   -webkit-appearance: none;
   writing-mode: bt-lr;
   appearance: slider-vertical;
-  width: 12px; height: 56px;
-  background: #000;
-  border: 1px solid #282834;
+  width: 14px;
+  height: 56px;
+  background: transparent;
   outline: none;
+  z-index: 2;
+  cursor: pointer;
 }
 .wa-vert-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 12px; height: 10px;
-  background: linear-gradient(to bottom, #aaaaaa 0%, #555555 45%, #00ff00 46%, #00ff00 54%, #333333 55%, #111111 100%);
-  border: 1px solid #ffffff;
-  border-bottom-color: #000;
+  width: 14px;
+  height: 11px;
+  background: linear-gradient(to bottom, #cccccc 0%, #777777 40%, #00ff00 45%, #00ff00 55%, #444444 60%, #111111 100%);
+  border: 1px solid #eeeeee;
+  border-bottom-color: #111;
+  box-shadow: inset 1px 1px 0 #fff, 0 1px 2px #000;
   cursor: pointer;
 }
 
 .wa-toggle-pill-btn { background: #333; border: 1px solid #666; color: #888; font-size: 8px; font-weight: bold; padding: 1px 5px; cursor: pointer; }
 .wa-toggle-pill-btn.active { background: #005500; color: #00ff00; border-color: #00ff00; }
-
 .wa-playlist-screen { height: 100px; background: #000; border: 1px solid #333; overflow-y: auto; font-size: 13px; color: #00ff00; }
 .wa-pl-item { padding: 2px 6px; display: flex; justify-content: space-between; cursor: pointer; }
 .wa-pl-item.active { background: #0000aa; color: #fff; }
@@ -254,7 +373,7 @@ body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--win
 
   <div id="crtScreen" class="crt-screen">
     
-    <!-- DESKTOP ICONS -->
+    <!-- DESKTOP -->
     <div id="desktop" onclick="handleDesktopClick(event)">
       <div class="desktop-icon" onclick="WindowManager.openOrRestore('appWindow')">
         <div class="desktop-icon-badge"><i class="fab fa-replyd" style="color: #ff9900;"></i></div>
@@ -305,6 +424,21 @@ body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--win
           <div style="display: flex; align-items: center; gap: 8px;">
             <span class="msn-username" id="msnHeaderUsername">Loading...</span>
             <span style="font-size: 10px; color: #555;" id="msnHeaderUserId">(ID: ...)</span>
+
+            <!-- Authentic Windows XP Luna Custom Dropdown -->
+            <div class="xp-select-container" id="statusComboboxContainer">
+              <div class="xp-combobox" onclick="toggleStatusDropdown(event)">
+                <span class="xp-combobox-text" id="statusSelectedText">(Online)</span>
+                <div class="xp-combobox-btn">▼</div>
+              </div>
+              <div class="xp-combobox-dropdown" id="statusDropdownMenu">
+                <div class="xp-combobox-option" onclick="selectStatus('online', '(Online)')">(Online)</div>
+                <div class="xp-combobox-option" onclick="selectStatus('busy', '(Busy)')">(Busy)</div>
+                <div class="xp-combobox-option" onclick="selectStatus('away', '(Be Right Back)')">(Be Right Back)</div>
+                <div class="xp-combobox-option" onclick="selectStatus('offline', '(Appear Offline)')">(Appear Offline)</div>
+              </div>
+            </div>
+
           </div>
           <input type="text" id="statusMessageInput" class="msn-status-msg" value="Listening to: 4. Crusher-P - Echo (3:50) ♪">
         </div>
@@ -351,7 +485,7 @@ body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--win
             </div>
 
             <div class="msn-action-bar">
-              <!-- Nudge button is dynamically toggled: visible in DMs, hidden in groups -->
+              <!-- Nudge button dynamically restricted to DMs -->
               <button id="msnNudgeBtn" class="msn-action-btn" style="display: none;" onclick="MSNMessenger.sendNudge()" title="Send Nudge"><i class="fas fa-bell" style="color: #ff9900;"></i> Nudge</button>
               <label class="msn-action-btn" style="cursor: pointer;">
                 <i class="fas fa-paperclip" style="color: #00aa55;"></i> Send File
@@ -449,7 +583,7 @@ body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--win
         </div>
       </div>
 
-      <!-- EQUALIZER PANEL WITH SPLINE CANVAS -->
+      <!-- EQUALIZER PANEL WITH GROOVED TRACKS & METALLIC GREEN-LINE SLIDERS -->
       <div class="wa-window-panel" id="waEqWindowPanel" style="border-top: 1px solid #111;">
         <div class="wa-titlebar">
           <span>WINAMP EQUALIZER</span>
@@ -462,16 +596,17 @@ body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--win
           </div>
         </div>
         <div style="display: flex; justify-content: space-between; padding: 4px; background: #191922;">
-          <input type="range" class="wa-vert-slider" min="-12" max="12" value="0" oninput="WinampPlayer.drawEqSpline()">
-          <input type="range" class="wa-vert-slider" min="-12" max="12" value="3" oninput="WinampPlayer.drawEqSpline()">
-          <input type="range" class="wa-vert-slider" min="-12" max="12" value="2" oninput="WinampPlayer.drawEqSpline()">
-          <input type="range" class="wa-vert-slider" min="-12" max="12" value="-1" oninput="WinampPlayer.drawEqSpline()">
-          <input type="range" class="wa-vert-slider" min="-12" max="12" value="-2" oninput="WinampPlayer.drawEqSpline()">
-          <input type="range" class="wa-vert-slider" min="-12" max="12" value="0" oninput="WinampPlayer.drawEqSpline()">
-          <input type="range" class="wa-vert-slider" min="-12" max="12" value="2" oninput="WinampPlayer.drawEqSpline()">
-          <input type="range" class="wa-vert-slider" min="-12" max="12" value="4" oninput="WinampPlayer.drawEqSpline()">
-          <input type="range" class="wa-vert-slider" min="-12" max="12" value="3" oninput="WinampPlayer.drawEqSpline()">
-          <input type="range" class="wa-vert-slider" min="-12" max="12" value="1" oninput="WinampPlayer.drawEqSpline()">
+          <!-- 10 Bands with Grooved Track Underlays -->
+          <div class="wa-eq-slot"><div class="wa-eq-slot-track"></div><input type="range" class="wa-vert-slider" min="-12" max="12" value="0" oninput="WinampPlayer.drawEqSpline()"></div>
+          <div class="wa-eq-slot"><div class="wa-eq-slot-track"></div><input type="range" class="wa-vert-slider" min="-12" max="12" value="3" oninput="WinampPlayer.drawEqSpline()"></div>
+          <div class="wa-eq-slot"><div class="wa-eq-slot-track"></div><input type="range" class="wa-vert-slider" min="-12" max="12" value="2" oninput="WinampPlayer.drawEqSpline()"></div>
+          <div class="wa-eq-slot"><div class="wa-eq-slot-track"></div><input type="range" class="wa-vert-slider" min="-12" max="12" value="-1" oninput="WinampPlayer.drawEqSpline()"></div>
+          <div class="wa-eq-slot"><div class="wa-eq-slot-track"></div><input type="range" class="wa-vert-slider" min="-12" max="12" value="-2" oninput="WinampPlayer.drawEqSpline()"></div>
+          <div class="wa-eq-slot"><div class="wa-eq-slot-track"></div><input type="range" class="wa-vert-slider" min="-12" max="12" value="0" oninput="WinampPlayer.drawEqSpline()"></div>
+          <div class="wa-eq-slot"><div class="wa-eq-slot-track"></div><input type="range" class="wa-vert-slider" min="-12" max="12" value="2" oninput="WinampPlayer.drawEqSpline()"></div>
+          <div class="wa-eq-slot"><div class="wa-eq-slot-track"></div><input type="range" class="wa-vert-slider" min="-12" max="12" value="4" oninput="WinampPlayer.drawEqSpline()"></div>
+          <div class="wa-eq-slot"><div class="wa-eq-slot-track"></div><input type="range" class="wa-vert-slider" min="-12" max="12" value="3" oninput="WinampPlayer.drawEqSpline()"></div>
+          <div class="wa-eq-slot"><div class="wa-eq-slot-track"></div><input type="range" class="wa-vert-slider" min="-12" max="12" value="1" oninput="WinampPlayer.drawEqSpline()"></div>
         </div>
       </div>
 
@@ -588,14 +723,14 @@ body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--win
   </div>
 </div>
 
-<!-- Include Modular Scripts -->
+<!-- Scripts -->
 <script src="winamp.js"></script>
 <script src="msn_messenger.js"></script>
 
 <script>
-// ==========================================
-// CENTRAL OS ORCHESTRATOR & WINDOW MANAGER
-// ==========================================
+// ========================================================
+// HIGH-PERFORMANCE 60FPS WINDOW MANAGER (RAF THROTTLED)
+// ========================================================
 let zIndexCounter = 200;
 let activeWindowId = 'appWindow';
 
@@ -650,9 +785,7 @@ const WindowManager = {
     meta.isMinimized = true;
     el.classList.add('hidden');
 
-    if (activeWindowId === id) {
-      activeWindowId = null;
-    }
+    if (activeWindowId === id) activeWindowId = null;
     this.updateTaskbar();
   },
 
@@ -720,7 +853,7 @@ const WindowManager = {
   }
 };
 
-// Pointer-captured Dragging & 8-Way Resizing
+// High performance requestAnimationFrame Drag & Resize loop
 function setupWindowInteractions() {
   Object.keys(windowsRegistry).forEach(winId => {
     const meta = windowsRegistry[winId];
@@ -729,7 +862,7 @@ function setupWindowInteractions() {
 
     winEl.addEventListener('pointerdown', () => WindowManager.activate(winId));
 
-    // Dragging
+    // Smooth Dragging
     const titlebar = winEl.querySelector('.xp-titlebar') || winEl.querySelector('.wa-titlebar');
     if (titlebar) {
       titlebar.addEventListener('pointerdown', (e) => {
@@ -742,14 +875,26 @@ function setupWindowInteractions() {
         const initialL = winEl.offsetLeft;
         const initialT = winEl.offsetTop;
 
-        function onPointerMove(ev) {
-          const newL = initialL + (ev.clientX - startX);
-          const newT = Math.max(0, Math.min(window.innerHeight - 50, initialT + (ev.clientY - startY)));
+        let rafId = null;
+        let curX = startX;
+        let curY = startY;
+
+        function updatePosition() {
+          const newL = initialL + (curX - startX);
+          const newT = Math.max(0, Math.min(window.innerHeight - 50, initialT + (curY - startY)));
           winEl.style.left = `${newL}px`;
           winEl.style.top = `${newT}px`;
+          rafId = null;
+        }
+
+        function onPointerMove(ev) {
+          curX = ev.clientX;
+          curY = ev.clientY;
+          if (!rafId) rafId = requestAnimationFrame(updatePosition);
         }
 
         function onPointerUp(ev) {
+          if (rafId) cancelAnimationFrame(rafId);
           titlebar.releasePointerCapture(ev.pointerId);
           titlebar.removeEventListener('pointermove', onPointerMove);
           titlebar.removeEventListener('pointerup', onPointerUp);
@@ -760,7 +905,7 @@ function setupWindowInteractions() {
       });
     }
 
-    // 8-Directional Resizing
+    // Smooth 8-Directional Resizing
     if (meta.canResize) {
       ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'].forEach(dir => {
         const handle = document.createElement('div');
@@ -780,23 +925,41 @@ function setupWindowInteractions() {
           const startL = winEl.offsetLeft;
           const startT = winEl.offsetTop;
 
-          function onPointerMove(ev) {
-            const dx = ev.clientX - startX;
-            const dy = ev.clientY - startY;
+          let rafId = null;
+          let curX = startX;
+          let curY = startY;
+
+          function updateBounds() {
+            const dx = curX - startX;
+            const dy = curY - startY;
 
             if (dir.includes('e')) winEl.style.width = `${Math.max(meta.minW, startW + dx)}px`;
             if (dir.includes('s')) winEl.style.height = `${Math.max(meta.minH, startH + dy)}px`;
             if (dir.includes('w')) {
               const newW = Math.max(meta.minW, startW - dx);
-              if (newW > meta.minW) { winEl.style.width = `${newW}px`; winEl.style.left = `${startL + dx}px`; }
+              if (newW > meta.minW) {
+                winEl.style.width = `${newW}px`;
+                winEl.style.left = `${startL + dx}px`;
+              }
             }
             if (dir.includes('n')) {
               const newH = Math.max(meta.minH, startH - dy);
-              if (newH > meta.minH) { winEl.style.height = `${newH}px`; winEl.style.top = `${startT + dy}px`; }
+              if (newH > meta.minH) {
+                winEl.style.height = `${newH}px`;
+                winEl.style.top = `${startT + dy}px`;
+              }
             }
+            rafId = null;
+          }
+
+          function onPointerMove(ev) {
+            curX = ev.clientX;
+            curY = ev.clientY;
+            if (!rafId) rafId = requestAnimationFrame(updateBounds);
           }
 
           function onPointerUp(ev) {
+            if (rafId) cancelAnimationFrame(rafId);
             handle.releasePointerCapture(ev.pointerId);
             handle.removeEventListener('pointermove', onPointerMove);
             handle.removeEventListener('pointerup', onPointerUp);
@@ -810,6 +973,26 @@ function setupWindowInteractions() {
   });
 }
 
+// Windows XP Combobox Logic
+function toggleStatusDropdown(e) {
+  e.stopPropagation();
+  const menu = document.getElementById('statusDropdownMenu');
+  menu.classList.toggle('show');
+}
+
+function selectStatus(statusVal, statusText) {
+  document.getElementById('statusSelectedText').innerText = statusText;
+  document.getElementById('statusDropdownMenu').classList.remove('show');
+  if (window.MSNMessenger && window.MSNMessenger.updateStatus) {
+    window.MSNMessenger.updateStatus(statusVal);
+  }
+}
+
+document.addEventListener('click', () => {
+  const menu = document.getElementById('statusDropdownMenu');
+  if (menu) menu.classList.remove('show');
+});
+
 function handleDesktopClick(e) {
   if (e.target.id === 'desktop') {
     Object.keys(windowsRegistry).forEach(id => {
@@ -822,7 +1005,6 @@ function handleDesktopClick(e) {
   }
 }
 
-// Tab Switching inside MSN
 function showGroupsTab() {
   document.getElementById('groupList').classList.remove('hidden');
   document.getElementById('groupControls').classList.remove('hidden');
@@ -911,7 +1093,6 @@ const FirebaseSync = (function() {
   };
 
   function init() {
-    // Restore saved settings from Firebase
     db.ref(`users/${userState.userId}/config`).once('value', snap => {
       const remote = snap.val();
       if (remote) {
@@ -962,7 +1143,6 @@ const FirebaseSync = (function() {
   };
 })();
 
-// System Clock
 function updateClock() {
   const d = new Date();
   let h = d.getHours();
