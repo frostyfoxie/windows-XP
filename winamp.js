@@ -1,6 +1,6 @@
 /**
- * Winamp 2.80 Classic Player (Webamp-Exact Replica Module)
- * Handles audio playback, Web Audio FFT visualizer, EQ spline, and custom sliders
+ * Winamp 2.80 Classic (Webamp-Exact Replica Module)
+ * Faithful to Nullsoft Winamp 2.x & Jordan Eldredge's Webamp specifications.
  */
 window.WinampPlayer = (function () {
   let audioCtx = null;
@@ -71,7 +71,6 @@ window.WinampPlayer = (function () {
       trackTitleEl.innerText = `${currentTrackIndex + 1}. ${track.title} (${track.duration})`;
     }
 
-    // Sync status with MSN Messenger
     if (window.MSNMessenger && window.MSNMessenger.setListeningTrack) {
       window.MSNMessenger.setListeningTrack(`${currentTrackIndex + 1}. ${track.title} (${track.duration})`);
     }
@@ -202,7 +201,7 @@ window.WinampPlayer = (function () {
     let x = 0;
 
     for (let i = 0; i < 16; i++) {
-      const barHeight = isPlaying ? (dataArray[i] / 255) * canvas.height : (Math.random() * 5 + 1);
+      const barHeight = isPlaying ? (dataArray[i] / 255) * canvas.height : (Math.random() * 4 + 1);
       const grad = ctx.createLinearGradient(0, canvas.height, 0, 0);
       grad.addColorStop(0, '#00ff00');
       grad.addColorStop(0.65, '#ffff00');
@@ -216,6 +215,7 @@ window.WinampPlayer = (function () {
     requestAnimationFrame(drawSpectrum);
   }
 
+  // Spline drawing with Catmull-Rom smoothing matching Nullsoft Winamp
   function drawEqSpline() {
     const canvas = document.getElementById('waEqSplineCanvas');
     if (!canvas) return;
@@ -225,18 +225,25 @@ window.WinampPlayer = (function () {
     const sliders = document.querySelectorAll('.wa-vert-slider');
     if (!sliders.length) return;
 
+    const points = [];
+    sliders.forEach((slider, idx) => {
+      const val = parseInt(slider.value) || 0;
+      const x = (idx / (sliders.length - 1)) * (canvas.width - 4) + 2;
+      const y = canvas.height / 2 - (val / 12) * (canvas.height / 2 - 2);
+      points.push({ x, y });
+    });
+
     ctx.beginPath();
     ctx.strokeStyle = '#00ff00';
     ctx.lineWidth = 1.2;
 
-    sliders.forEach((slider, idx) => {
-      const val = parseInt(slider.value) || 0;
-      const x = (idx / (sliders.length - 1)) * canvas.width;
-      const y = canvas.height / 2 - (val / 12) * (canvas.height / 2 - 2);
-      if (idx === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    });
-
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 0; i < points.length - 1; i++) {
+      const xc = (points[i].x + points[i + 1].x) / 2;
+      const yc = (points[i].y + points[i + 1].y) / 2;
+      ctx.quadraticCurveTo(points[i].x, points[i].y, xc, yc);
+    }
+    ctx.lineTo(points[points.length - 1].x, points[points.length - 1].y);
     ctx.stroke();
   }
 
@@ -256,17 +263,11 @@ window.WinampPlayer = (function () {
     }
 
     const title = file.name.replace(/\.[^/.]+$/, "");
-    playlist.push({
-      title,
-      duration: "03:40",
-      isSynth: false
-    });
-
+    playlist.push({ title, duration: "03:40", isSynth: false });
     currentTrackIndex = playlist.length - 1;
     renderPlaylist();
     play();
 
-    // Backup custom songs list to Firebase
     if (window.FirebaseSync) {
       window.FirebaseSync.backupSongs(playlist);
     }
