@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Windows XP</title>
+<title>Windows XP Professional - MSN Messenger, Winamp 2.8 & Yahoo! Browser</title>
 
 <!-- External Icon & Font Assets -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -43,10 +43,10 @@ body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--win
 
 .desktop-icon { width: 82px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; text-shadow: 1px 1px 3px rgba(0,0,0,0.9); cursor: pointer; padding: 6px 4px; border: 1px transparent dashed; border-radius: 4px; z-index: 2; }
 .desktop-icon:hover { background-color: rgba(11, 93, 218, 0.45); border-color: rgba(255, 255, 255, 0.6); }
-.desktop-icon-badge { font-size: 32px; margin-bottom: 6px; width: 46px; height: 46px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); }
+.desktop-icon-badge { font-size: 30px; margin-bottom: 6px; width: 46px; height: 46px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); }
 .desktop-icon span { font-size: 11px; text-align: center; }
 
-/* Ultra-Smooth Windows XP Window Styling with GPU compositing */
+/* 60fps Hardware Accelerated Windows XP Windows */
 .xp-window {
   position: absolute;
   background: #f0f6fe;
@@ -113,77 +113,23 @@ body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--win
 .rh-se { bottom: -3px; right: -3px; width: 16px; height: 16px; cursor: se-resize; background: linear-gradient(135deg, transparent 50%, #444 50%); }
 .xp-window.window-maximized .rh { display: none !important; }
 
-/* ========================================================
-   AUTHENTIC WINDOWS XP LUNA DROPDOWN COMBOBOX (CUSTOM CSS)
-   ======================================================== */
-.xp-select-container {
-  position: relative;
-  display: inline-block;
-  font-family: var(--win-font);
-  font-size: 11px;
-}
-
-.xp-combobox {
-  display: flex;
-  align-items: center;
-  background: #ffffff;
-  border: 1px solid #7f9db9;
-  border-radius: 2px;
-  cursor: pointer;
-  height: 22px;
-  padding-left: 6px;
-  box-shadow: inset 1px 1px 1px rgba(0,0,0,0.1);
-}
-
+/* Custom Windows XP Luna Combobox */
+.xp-select-container { position: relative; display: inline-block; font-family: var(--win-font); font-size: 11px; }
+.xp-combobox { display: flex; align-items: center; background: #ffffff; border: 1px solid #7f9db9; border-radius: 2px; cursor: pointer; height: 22px; padding-left: 6px; box-shadow: inset 1px 1px 1px rgba(0,0,0,0.1); }
 .xp-combobox:hover { border-color: #316ac5; }
-
-.xp-combobox-text {
-  flex: 1;
-  color: #0f4073;
-  white-space: nowrap;
-  padding-right: 6px;
-}
-
-.xp-combobox-btn {
-  width: 17px;
-  height: 100%;
-  background: linear-gradient(to bottom, #dbeafc 0%, #b8d4f8 45%, #92bce3 55%, #c8e0fe 100%);
-  border-left: 1px solid #7f9db9;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #000;
-  font-size: 8px;
-}
-
-.xp-combobox:hover .xp-combobox-btn {
-  background: linear-gradient(to bottom, #eaf3fe 0%, #cde1fa 50%, #a4caf0 100%);
-}
-
-.xp-combobox-dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  width: 100%;
-  background: #ffffff;
-  border: 1px solid #7f9db9;
-  box-shadow: 2px 3px 6px rgba(0,0,0,0.3);
-  z-index: 99999;
-  display: none;
-}
-
+.xp-combobox-text { flex: 1; color: #0f4073; white-space: nowrap; padding-right: 6px; }
+.xp-combobox-btn { width: 17px; height: 100%; background: linear-gradient(to bottom, #dbeafc 0%, #b8d4f8 45%, #92bce3 55%, #c8e0fe 100%); border-left: 1px solid #7f9db9; display: flex; align-items: center; justify-content: center; color: #000; font-size: 8px; }
+.xp-combobox-dropdown { position: absolute; top: 100%; left: 0; width: 100%; background: #ffffff; border: 1px solid #7f9db9; box-shadow: 2px 3px 6px rgba(0,0,0,0.3); z-index: 99999; display: none; }
 .xp-combobox-dropdown.show { display: block; }
+.xp-combobox-option { padding: 3px 6px; cursor: pointer; color: #000; }
+.xp-combobox-option:hover { background: #316ac5; color: #ffffff; }
 
-.xp-combobox-option {
-  padding: 3px 6px;
-  cursor: pointer;
-  color: #000;
-}
-
-.xp-combobox-option:hover {
-  background: #316ac5;
-  color: #ffffff;
-}
+/* Yahoo! Browser Custom Styles */
+.browser-toolbar { background: #ece9d8; border-bottom: 1px solid #d0ccb8; padding: 4px 6px; display: flex; align-items: center; gap: 4px; font-size: 11px; }
+.browser-tool-btn { padding: 2px 6px; border: 1px solid transparent; border-radius: 3px; cursor: pointer; display: flex; align-items: center; gap: 4px; color: #000; background: none; }
+.browser-tool-btn:hover { background: linear-gradient(to bottom, #ffffff, #dcd7ce); border-color: #7f9db9; }
+.browser-address-bar { background: #ece9d8; border-bottom: 1px solid #999; padding: 3px 8px; display: flex; align-items: center; gap: 6px; font-size: 11px; }
+.browser-status-bar { height: 22px; background: #ece9d8; border-top: 1px solid #d0ccb8; display: flex; align-items: center; justify-content: space-between; padding: 0 8px; font-size: 11px; color: #333; }
 
 /* MSN Layout */
 .msn-user-header { background: linear-gradient(to bottom, #e3effd 0%, #c3ddf9 60%, #b2d3f7 100%); padding: 8px 12px; border-bottom: 1px solid #84aee0; display: flex; align-items: center; gap: 12px; }
@@ -239,9 +185,7 @@ body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--win
   100% { transform: translate(0, 0) rotate(0deg); }
 }
 
-/* =======================================================
-   WEBAMP REPLICA GRADIENT & EQUALIZER VERTICAL SLIDERS
-   ======================================================= */
+/* Winamp Webamp Exact Replica Sliders */
 #winampContainerWindow { width: 275px; z-index: 120; }
 .wa-window-panel { background: linear-gradient(to bottom, #30303c, #1e1e28); border: 2px solid #5d5d6d; box-shadow: inset 1px 1px 0 #7e7e8e, inset -1px -1px 0 #111; padding: 3px; display: flex; flex-direction: column; color: #00ff00; font-family: var(--digital-font); }
 .wa-titlebar { background: linear-gradient(to right, #0d1259 0%, #173fa5 30%, #2062cc 50%, #173fa5 70%, #0d1259 100%); color: #d1e2ff; font-family: Arial, sans-serif; font-size: 9px; font-weight: bold; padding: 2px 4px; display: flex; justify-content: space-between; cursor: move; height: 18px; }
@@ -294,45 +238,11 @@ body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--win
   cursor: pointer;
 }
 
-/* Discrete Grooved Vertical EQ Sliders with Neon Green Horizontal Bar */
-.wa-eq-slot {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  position: relative;
-  width: 14px;
-}
-.wa-eq-slot-track {
-  position: absolute;
-  top: 0;
-  width: 4px;
-  height: 56px;
-  background: #000;
-  border: 1px solid #222;
-  box-shadow: inset 1px 1px 1px #000;
-  background-image: repeating-linear-gradient(180deg, #444 0px, #444 1px, transparent 1px, transparent 5px);
-}
-.wa-vert-slider {
-  -webkit-appearance: none;
-  writing-mode: bt-lr;
-  appearance: slider-vertical;
-  width: 14px;
-  height: 56px;
-  background: transparent;
-  outline: none;
-  z-index: 2;
-  cursor: pointer;
-}
-.wa-vert-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 14px;
-  height: 11px;
-  background: linear-gradient(to bottom, #cccccc 0%, #777777 40%, #00ff00 45%, #00ff00 55%, #444444 60%, #111111 100%);
-  border: 1px solid #eeeeee;
-  border-bottom-color: #111;
-  box-shadow: inset 1px 1px 0 #fff, 0 1px 2px #000;
-  cursor: pointer;
-}
+/* Vertical EQ Sliders with Grooved Slot & Green-Line Indicator */
+.wa-eq-slot { display: flex; flex-direction: column; align-items: center; position: relative; width: 14px; }
+.wa-eq-slot-track { position: absolute; top: 0; width: 4px; height: 56px; background: #000; border: 1px solid #222; box-shadow: inset 1px 1px 1px #000; background-image: repeating-linear-gradient(180deg, #444 0px, #444 1px, transparent 1px, transparent 5px); }
+.wa-vert-slider { -webkit-appearance: none; writing-mode: bt-lr; appearance: slider-vertical; width: 14px; height: 56px; background: transparent; outline: none; z-index: 2; cursor: pointer; }
+.wa-vert-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 11px; background: linear-gradient(to bottom, #cccccc 0%, #777777 40%, #00ff00 45%, #00ff00 55%, #444444 60%, #111111 100%); border: 1px solid #eeeeee; border-bottom-color: #111; box-shadow: inset 1px 1px 0 #fff, 0 1px 2px #000; cursor: pointer; }
 
 .wa-toggle-pill-btn { background: #333; border: 1px solid #666; color: #888; font-size: 8px; font-weight: bold; padding: 1px 5px; cursor: pointer; }
 .wa-toggle-pill-btn.active { background: #005500; color: #00ff00; border-color: #00ff00; }
@@ -380,6 +290,11 @@ body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--win
         <span>MSN Messenger</span>
       </div>
 
+      <div class="desktop-icon" onclick="WindowManager.openOrRestore('yahooBrowserWindow')">
+        <div class="desktop-icon-badge"><i class="fas fa-compass" style="color: #aa00cc;"></i></div>
+        <span>Yahoo! Browser</span>
+      </div>
+
       <div class="desktop-icon" onclick="WindowManager.openOrRestore('winampContainerWindow')">
         <div class="desktop-icon-badge"><i class="fas fa-bolt" style="color: #ffcc00;"></i></div>
         <span>Winamp 2.8</span>
@@ -401,7 +316,57 @@ body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--win
       </div>
     </div>
 
-    <!-- WINDOW 1: MSN MESSENGER '05 -->
+    <!-- WINDOW 1: YAHOO! BROWSER '05 (UNIVERSAL SUITE) -->
+    <div id="yahooBrowserWindow" class="xp-window hidden" style="top: 35px; left: 60px; width: 860px; height: 560px;">
+      <div class="xp-titlebar" id="yahooBrowserWindowHeader" ondblclick="WindowManager.toggleMaximize('yahooBrowserWindow')">
+        <div style="display: flex; gap: 8px; align-items: center; pointer-events: none;">
+          <i class="fas fa-compass" style="color: #ffee00;"></i>
+          <span>Yahoo! Browser - Internet Explorer 6.0</span>
+        </div>
+        <div class="xp-controls">
+          <div class="xp-btn-ctrl xp-btn-minimize" onclick="WindowManager.minimize('yahooBrowserWindow')">_</div>
+          <div class="xp-btn-ctrl xp-btn-maximize" id="yahooBrowserWindowMaxBtn" onclick="WindowManager.toggleMaximize('yahooBrowserWindow')">□</div>
+          <div class="xp-btn-ctrl xp-btn-close" onclick="WindowManager.close('yahooBrowserWindow')">✕</div>
+        </div>
+      </div>
+
+      <!-- Browser Menu & Toolbars -->
+      <div class="xp-menubar">
+        <span class="xp-menu-item" onclick="YahooBrowser.goHome()"><u>F</u>ile</span>
+        <span class="xp-menu-item" onclick="YahooBrowser.reload()"><u>E</u>dit</span>
+        <span class="xp-menu-item" onclick="YahooBrowser.reload()"><u>V</u>iew</span>
+        <span class="xp-menu-item" onclick="YahooBrowser.navigate('https://wiby.me')"><u>F</u>avorites</span>
+        <span class="xp-menu-item" onclick="YahooBrowser.navigate('about:yahoo')"><u>T</u>ools</span>
+        <span class="xp-menu-item" onclick="alert('Yahoo! Browser 2005 Edition\nUniversal Web Engine Enabled')"><u>H</u>elp</span>
+      </div>
+
+      <div class="browser-toolbar">
+        <button class="browser-tool-btn" onclick="YahooBrowser.goBack()"><i class="fas fa-arrow-left" style="color:#008800;"></i> Back</button>
+        <button class="browser-tool-btn" onclick="YahooBrowser.goForward()"><i class="fas fa-arrow-right" style="color:#008800;"></i> Forward</button>
+        <button class="browser-tool-btn" onclick="YahooBrowser.reload()"><i class="fas fa-redo" style="color:#0055ff;"></i> Refresh</button>
+        <button class="browser-tool-btn" onclick="YahooBrowser.goHome()"><i class="fas fa-home" style="color:#ff8800;"></i> Home</button>
+        <button class="browser-tool-btn" onclick="YahooBrowser.navigate('https://www.google.com/search?igu=1')"><i class="fas fa-search" style="color:#cc0000;"></i> Search</button>
+      </div>
+
+      <div class="browser-address-bar">
+        <span>Address:</span>
+        <input type="text" id="yahooAddressInput" class="xp-input" style="flex:1; height:22px; font-size:12px;" value="http://www.yahoo.com/" onkeydown="if(event.key==='Enter') YahooBrowser.navigate(this.value)">
+        <button class="xp-button" style="padding:2px 8px; height:22px;" onclick="YahooBrowser.navigate(document.getElementById('yahooAddressInput').value)"><i class="fas fa-arrow-circle-right" style="color:#00aa00;"></i> Go</button>
+      </div>
+
+      <!-- Web Content Viewport -->
+      <div id="yahooViewportContainer" style="flex:1; background:#ffffff; position:relative; overflow:hidden;"></div>
+
+      <div class="browser-status-bar">
+        <span id="yahooStatusText">Done</span>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span>Internet Zone</span>
+          <i id="yahooThrobber" class="fas fa-globe-americas" style="color:#388efd;"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- WINDOW 2: MSN MESSENGER '05 -->
     <div id="appWindow" class="xp-window" style="top: 25px; left: 25px; width: 920px; height: 620px;">
       <div class="xp-titlebar" id="appWindowHeader" ondblclick="WindowManager.toggleMaximize('appWindow')">
         <div style="display: flex; gap: 8px; align-items: center; pointer-events: none;">
@@ -425,7 +390,7 @@ body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--win
             <span class="msn-username" id="msnHeaderUsername">Loading...</span>
             <span style="font-size: 10px; color: #555;" id="msnHeaderUserId">(ID: ...)</span>
 
-            <!-- Authentic Windows XP Luna Custom Dropdown -->
+            <!-- Windows XP Custom Dropdown -->
             <div class="xp-select-container" id="statusComboboxContainer">
               <div class="xp-combobox" onclick="toggleStatusDropdown(event)">
                 <span class="xp-combobox-text" id="statusSelectedText">(Online)</span>
@@ -438,7 +403,6 @@ body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--win
                 <div class="xp-combobox-option" onclick="selectStatus('offline', '(Appear Offline)')">(Appear Offline)</div>
               </div>
             </div>
-
           </div>
           <input type="text" id="statusMessageInput" class="msn-status-msg" value="Listening to: 4. Crusher-P - Echo (3:50) ♪">
         </div>
@@ -496,7 +460,7 @@ body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--win
             <div id="chatArea" class="message-container">
               <div style="background: #f0f7ff; padding: 12px; border: 1px solid #92bce3; border-radius: 4px;">
                 <b>Welcome to MSN Messenger '05 ChitChat Enclave!</b>
-                <p style="font-size: 11px; margin-top: 4px;">All communications are backed up to Firebase while remaining cryptographically private with PBKDF2/AES-GCM encryption.</p>
+                <p style="font-size: 11px; margin-top: 4px;">Send end-to-end encrypted messages and photos. Nudges are exclusively active during 1-on-1 Buddy DMs.</p>
               </div>
             </div>
 
@@ -511,7 +475,7 @@ body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--win
       </div>
     </div>
 
-    <!-- WINDOW 2: WINAMP 2.80 (WEBAMP REPLICA) -->
+    <!-- WINDOW 3: WINAMP 2.80 -->
     <div id="winampContainerWindow" class="xp-window" style="top: 30px; left: calc(100vw - 295px); background: none; border: none; box-shadow: none;">
       <div class="wa-window-panel">
         <div class="wa-titlebar" id="winampHeader">
@@ -537,7 +501,7 @@ body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--win
           </div>
         </div>
 
-        <!-- Volume & Balance Sliders: Authentic Webamp Wedge Gradient -->
+        <!-- Volume & Balance Sliders -->
         <div style="display: flex; align-items: center; gap: 6px; padding: 4px 0;">
           <span style="font-size: 8px; color: #888;">VOL</span>
           <div class="wa-slider-wrap">
@@ -555,7 +519,7 @@ body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--win
           <button class="wa-toggle-pill-btn active" id="waPlToggleBtn" onclick="WinampPlayer.togglePl()">PL</button>
         </div>
 
-        <!-- Seek Bar: Classic Gold Metallic Thumb -->
+        <!-- Seek Bar -->
         <div style="padding: 2px 0;">
           <div class="wa-seek-bar-track">
             <input type="range" class="wa-seek-slider" id="winampSeekBar" min="0" max="100" value="48" oninput="WinampPlayer.seek(this.value)">
@@ -583,7 +547,7 @@ body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--win
         </div>
       </div>
 
-      <!-- EQUALIZER PANEL WITH GROOVED TRACKS & METALLIC GREEN-LINE SLIDERS -->
+      <!-- EQUALIZER PANEL -->
       <div class="wa-window-panel" id="waEqWindowPanel" style="border-top: 1px solid #111;">
         <div class="wa-titlebar">
           <span>WINAMP EQUALIZER</span>
@@ -596,7 +560,6 @@ body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--win
           </div>
         </div>
         <div style="display: flex; justify-content: space-between; padding: 4px; background: #191922;">
-          <!-- 10 Bands with Grooved Track Underlays -->
           <div class="wa-eq-slot"><div class="wa-eq-slot-track"></div><input type="range" class="wa-vert-slider" min="-12" max="12" value="0" oninput="WinampPlayer.drawEqSpline()"></div>
           <div class="wa-eq-slot"><div class="wa-eq-slot-track"></div><input type="range" class="wa-vert-slider" min="-12" max="12" value="3" oninput="WinampPlayer.drawEqSpline()"></div>
           <div class="wa-eq-slot"><div class="wa-eq-slot-track"></div><input type="range" class="wa-vert-slider" min="-12" max="12" value="2" oninput="WinampPlayer.drawEqSpline()"></div>
@@ -624,7 +587,7 @@ body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--win
       </div>
     </div>
 
-    <!-- WINDOW 3: DISPLAY PROPERTIES -->
+    <!-- WINDOW 4: DISPLAY PROPERTIES -->
     <div id="displaySettingsWindow" class="xp-window hidden" style="top: 80px; left: 100px; width: 360px; height: 340px;">
       <div class="xp-titlebar" id="displaySettingsWindowHeader">
         <span>Display Properties - CRT & Wallpaper</span>
@@ -643,7 +606,7 @@ body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--win
       </div>
     </div>
 
-    <!-- WINDOW 4: MINESWEEPER -->
+    <!-- WINDOW 5: MINESWEEPER -->
     <div id="minesweeperWindow" class="xp-window hidden" style="top: 100px; left: 160px; width: 200px; height: 240px;">
       <div class="xp-titlebar" id="minesweeperWindowHeader">
         <span>Minesweeper</span>
@@ -656,7 +619,7 @@ body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--win
       </div>
     </div>
 
-    <!-- WINDOW 5: NOTEPAD -->
+    <!-- WINDOW 6: NOTEPAD -->
     <div id="notepadWindow" class="xp-window hidden" style="top: 120px; left: 200px; width: 320px; height: 240px;">
       <div class="xp-titlebar" id="notepadWindowHeader">
         <span>Untitled - Notepad</span>
@@ -676,6 +639,7 @@ body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--win
         <span id="startMenuUsername">XP User</span>
       </div>
       <div class="start-item" onclick="WindowManager.openOrRestore('appWindow'); closeStartMenu();"><i class="fab fa-replyd" style="color: #ff9900;"></i> MSN Messenger</div>
+      <div class="start-item" onclick="WindowManager.openOrRestore('yahooBrowserWindow'); closeStartMenu();"><i class="fas fa-compass" style="color: #aa00cc;"></i> Yahoo! Browser</div>
       <div class="start-item" onclick="WindowManager.openOrRestore('winampContainerWindow'); closeStartMenu();"><i class="fas fa-bolt" style="color: #ffcc00;"></i> Winamp 2.8</div>
       <div class="start-item" onclick="WindowManager.openOrRestore('displaySettingsWindow'); closeStartMenu();"><i class="fas fa-tv" style="color: #00ffcc;"></i> Display Settings</div>
       <div class="start-item" onclick="WindowManager.openOrRestore('minesweeperWindow'); closeStartMenu();"><i class="fas fa-bomb" style="color: #ff4444;"></i> Minesweeper</div>
@@ -726,16 +690,16 @@ body, html { width: 100%; height: 100%; overflow: hidden; font-family: var(--win
 <!-- Scripts -->
 <script src="winamp.js"></script>
 <script src="msn_messenger.js"></script>
+<script src="yahoo_browser.js"></script>
 
 <script>
-// ========================================================
-// HIGH-PERFORMANCE 60FPS WINDOW MANAGER (RAF THROTTLED)
-// ========================================================
+// Window Manager Registration
 let zIndexCounter = 200;
 let activeWindowId = 'appWindow';
 
 const windowsRegistry = {
   appWindow: { id: 'appWindow', title: 'MSN Messenger', icon: 'fab fa-replyd', isOpen: true, isMinimized: false, isMaximized: false, canResize: true, canMaximize: true, minW: 360, minH: 260, restoreRect: { top: 25, left: 25, width: 920, height: 620 } },
+  yahooBrowserWindow: { id: 'yahooBrowserWindow', title: 'Yahoo! Browser', icon: 'fas fa-compass', isOpen: false, isMinimized: false, isMaximized: false, canResize: true, canMaximize: true, minW: 480, minH: 320, restoreRect: { top: 35, left: 60, width: 860, height: 560 } },
   winampContainerWindow: { id: 'winampContainerWindow', title: 'Winamp 2.80', icon: 'fas fa-bolt', isOpen: true, isMinimized: false, isMaximized: false, canResize: false, canMaximize: false, restoreRect: { top: 30, left: window.innerWidth - 295, width: 275, height: 400 } },
   displaySettingsWindow: { id: 'displaySettingsWindow', title: 'CRT Properties', icon: 'fas fa-tv', isOpen: false, isMinimized: false, isMaximized: false, canResize: true, canMaximize: false, minW: 300, minH: 200, restoreRect: { top: 80, left: 100, width: 360, height: 340 } },
   minesweeperWindow: { id: 'minesweeperWindow', title: 'Minesweeper', icon: 'fas fa-bomb', isOpen: false, isMinimized: false, isMaximized: false, canResize: false, canMaximize: false, restoreRect: { top: 100, left: 160, width: 200, height: 240 } },
@@ -853,7 +817,7 @@ const WindowManager = {
   }
 };
 
-// High performance requestAnimationFrame Drag & Resize loop
+// 60fps RequestAnimationFrame Drag & Resize Engine
 function setupWindowInteractions() {
   Object.keys(windowsRegistry).forEach(winId => {
     const meta = windowsRegistry[winId];
@@ -973,7 +937,19 @@ function setupWindowInteractions() {
   });
 }
 
-// Windows XP Combobox Logic
+function handleDesktopClick(e) {
+  if (e.target.id === 'desktop') {
+    Object.keys(windowsRegistry).forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.add('inactive');
+    });
+    activeWindowId = null;
+    WindowManager.updateTaskbar();
+    closeStartMenu();
+  }
+}
+
+// Windows XP Combobox Dropdown Logic
 function toggleStatusDropdown(e) {
   e.stopPropagation();
   const menu = document.getElementById('statusDropdownMenu');
@@ -992,18 +968,6 @@ document.addEventListener('click', () => {
   const menu = document.getElementById('statusDropdownMenu');
   if (menu) menu.classList.remove('show');
 });
-
-function handleDesktopClick(e) {
-  if (e.target.id === 'desktop') {
-    Object.keys(windowsRegistry).forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.classList.add('inactive');
-    });
-    activeWindowId = null;
-    WindowManager.updateTaskbar();
-    closeStartMenu();
-  }
-}
 
 function showGroupsTab() {
   document.getElementById('groupList').classList.remove('hidden');
@@ -1064,9 +1028,7 @@ function showSecurityInfo() {
   alert("MSN ChitChat Enclave:\n• PBKDF2 100,000 SHA-256 iterations\n• AES-256-GCM symmetric authentication\n• Direct-message Nudges\n• Firebase Cloud backup for files & user settings");
 }
 
-// ==========================================
-// FIREBASE PERSISTENCE & USER SYNC
-// ==========================================
+// Firebase Cloud Sync Provider
 const FirebaseSync = (function() {
   const firebaseConfig = {
     apiKey: "AIzaSyCqobhf4HFUdBIZJMF-s9uW3e0-EGh327I",
@@ -1159,6 +1121,7 @@ window.onload = function() {
   FirebaseSync.init();
   MSNMessenger.init(FirebaseSync.getDb(), FirebaseSync.getUserState());
   WinampPlayer.init();
+  YahooBrowser.init();
 
   setupWindowInteractions();
   WindowManager.updateTaskbar();
