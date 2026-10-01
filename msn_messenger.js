@@ -1,6 +1,11 @@
 /**
  * MSN Messenger '05 Encrypted ChitChat Enclave Module
  * Cryptographically secured with PBKDF2 (100k SHA-256 iterations) + AES-256-GCM.
+ * Fully features:
+ *  - Buddies sidepanel with real-time member listing and presence
+ *  - Nudge button strictly enabled in DMs (disabled in groups) with multi-user window shaking
+ *  - Chunked file/photo transmission avoiding call-stack limits
+ *  - Emoticons & Wink magic animations
  */
 window.MSNMessenger = (function () {
   let db = null;
@@ -13,6 +18,7 @@ window.MSNMessenger = (function () {
   let activeGroupId = null;
   let activeDMId = null;
   let currentEncryptionKey = null;
+  let participantsVisible = true;
 
   const joinedGroups = new Set();
   const groupPasswords = {};
@@ -35,12 +41,10 @@ window.MSNMessenger = (function () {
     updateUI();
   }
 
-  // Safe Firebase Key Sanitization
   function sanitizePath(id) {
     return (id || '').replace(/[.#$\[\]\/]/g, '_').trim();
   }
 
-  // Safe chunked ArrayBuffer <-> Base64 conversion (avoids V8 call stack size limit on large files)
   function arrayBufferToBase64(buffer) {
     let binary = '';
     const bytes = new Uint8Array(buffer);
@@ -109,13 +113,18 @@ window.MSNMessenger = (function () {
     );
   }
 
+  // Dynamic Nudge: Full color and operational in DMs, disabled with tooltip in groups
   function updateNudgeVisibility() {
     const nudgeBtn = document.getElementById('msnNudgeBtn');
     if (!nudgeBtn) return;
     if (activeDMId) {
-      nudgeBtn.style.display = 'inline-flex';
+      nudgeBtn.style.opacity = '1';
+      nudgeBtn.style.cursor = 'pointer';
+      nudgeBtn.title = 'Send MSN Nudge (Shakes Buddy Screen)';
     } else {
-      nudgeBtn.style.display = 'none';
+      nudgeBtn.style.opacity = '0.4';
+      nudgeBtn.style.cursor = 'not-allowed';
+      nudgeBtn.title = 'Nudge is only available in 1-on-1 Buddy Chats (DMs)';
     }
   }
 
@@ -226,6 +235,23 @@ window.MSNMessenger = (function () {
     updateNudgeVisibility();
     listenDMMessages();
 
+    // Populate Participants with the buddy
+    const listEl = document.getElementById('participantsList');
+    if (listEl) {
+      listEl.innerHTML = `
+        <div class="participant-item">
+          <div class="participant-avatar"><i class="fas fa-user"></i></div>
+          <div style="flex:1;"><b>${escapeHtml(otherId)}</b> (Buddy)</div>
+        </div>
+        <div class="participant-item">
+          <div class="participant-avatar"><i class="fas fa-user-circle"></i></div>
+          <div style="flex:1;"><b>${escapeHtml(username)}</b> (You)</div>
+        </div>
+      `;
+      const countEl = document.getElementById('buddyCount');
+      if (countEl) countEl.innerText = '2';
+    }
+
     document.getElementById('dmUserInput').value = '';
   }
 
@@ -283,7 +309,7 @@ window.MSNMessenger = (function () {
         username,
         avatar: userAvatar,
         isNudge: true,
-        text: `⚡ [You received an MSN NUDGE!] ⚡`,
+        text: `⚡ [Sent you an MSN NUDGE!] ⚡`,
         timestamp: Date.now()
       });
     }
@@ -314,6 +340,44 @@ window.MSNMessenger = (function () {
     }
 
     setTimeout(() => appWin.classList.remove('nudge-shake'), 900);
+  }
+
+  function toggleParticipants() {
+    participantsVisible = !participantsVisible;
+    const p = document.getElementById('participantsPanel');
+    if (p) p.classList.toggle('hidden', !participantsVisible);
+  }
+
+  function toggleEmoticonPicker() {
+    const el = document.getElementById('emoticonPicker');
+    if (el) el.classList.toggle('hidden');
+  }
+
+  function insertEmoticon(emo) {
+    const input = document.getElementById('messageText');
+    if (input) {
+      input.value += ` ${emo} `;
+      input.focus();
+    }
+    toggleEmoticonPicker();
+  }
+
+  function playWinkAnimation() {
+    const appWin = document.getElementById('appWindow');
+    const overlay = document.createElement('div');
+    overlay.style.position = 'absolute';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.width = '100%';
+    overlay.style.height = '100%';
+    overlay.style.pointerEvents = 'none';
+    overlay.style.display = 'flex';
+    overlay.style.alignItems = 'center';
+    overlay.style.justifyContent = 'center';
+    overlay.style.zIndex = '9999';
+    overlay.innerHTML = `<i class="fas fa-magic" style="font-size: 110px; color: #9933ff; filter: drop-shadow(0 0 20px #ffcc00); animation: pulse 0.7s infinite alternate;"></i>`;
+    appWin.appendChild(overlay);
+    setTimeout(() => overlay.remove(), 2000);
   }
 
   async function sendMessage() {
@@ -348,19 +412,17 @@ window.MSNMessenger = (function () {
     input.value = '';
   }
 
-  // Robust file & image transmission with chunked conversion
   async function sendFile(event) {
     const file = event.target.files[0];
     if (!file) return;
 
     if (!activeGroupId && !activeDMId) {
-      alert("Please join an encrypted group or open a DM before sending files.");
+      alert("Join an encrypted group or open a DM first.");
       return;
     }
 
-    // Guard against Firebase Realtime Database size overflow (> 6 MB)
     if (file.size > 6 * 1024 * 1024) {
-      alert("File size exceeds 6 MB limit for Realtime Database transport. Please choose a smaller file.");
+      alert("File size exceeds 6 MB limit. Please select a smaller file.");
       event.target.value = '';
       return;
     }
@@ -397,7 +459,7 @@ window.MSNMessenger = (function () {
       }
     } catch (err) {
       console.error("Failed to send file:", err);
-      alert("Failed to send file: " + err.message);
+      alert("File send error: " + err.message);
     } finally {
       event.target.value = '';
     }
@@ -437,9 +499,7 @@ window.MSNMessenger = (function () {
             innerHtml = `
               <div class="text">
                 <div style="font-size: 11px; margin-bottom: 4px;"><i class="fas fa-image" style="color: #00aa55;"></i> ${escapeHtml(msg.filename)} (${formatBytes(msg.fileSize || decBuf.byteLength)})</div>
-                <a href="${url}" target="_blank" title="View Full Image">
-                  <img src="${url}" class="chat-shared-img" alt="${escapeHtml(msg.filename)}">
-                </a>
+                <a href="${url}" target="_blank"><img src="${url}" class="chat-shared-img" alt="${escapeHtml(msg.filename)}"></a>
                 <a href="${url}" download="${msg.filename || 'image.png'}" class="file-attachment-link"><i class="fas fa-download"></i> Save Image</a>
               </div>
             `;
@@ -452,7 +512,6 @@ window.MSNMessenger = (function () {
             `;
           }
         } catch (e) {
-          console.error("Decryption error:", e);
           innerHtml = `<div class="text" style="color: #c00;">[File decryption error - invalid key]</div>`;
         }
       }
@@ -465,9 +524,7 @@ window.MSNMessenger = (function () {
           innerHtml = `
             <div class="text">
               <div style="font-size: 11px; margin-bottom: 4px;"><i class="fas fa-image" style="color: #00aa55;"></i> ${escapeHtml(msg.filename || 'Photo')} (${formatBytes(msg.fileSize)})</div>
-              <a href="${msg.file}" target="_blank" title="View Full Image">
-                <img src="${msg.file}" class="chat-shared-img" alt="${escapeHtml(msg.filename || 'Photo')}">
-              </a>
+              <a href="${msg.file}" target="_blank"><img src="${msg.file}" class="chat-shared-img" alt="${escapeHtml(msg.filename || 'Photo')}"></a>
               <a href="${msg.file}" download="${msg.filename || 'photo.png'}" class="file-attachment-link"><i class="fas fa-download"></i> Save Image</a>
             </div>
           `;
@@ -508,6 +565,10 @@ window.MSNMessenger = (function () {
       const users = snap.val();
       listEl.innerHTML = '';
       if (users) {
+        const userCount = Object.keys(users).length;
+        const countEl = document.getElementById('buddyCount');
+        if (countEl) countEl.innerText = userCount;
+
         Object.entries(users).forEach(([id, u]) => {
           const div = document.createElement('div');
           div.className = 'participant-item';
@@ -584,6 +645,10 @@ window.MSNMessenger = (function () {
     joinGroup,
     startDM,
     sendNudge,
+    toggleParticipants,
+    toggleEmoticonPicker,
+    insertEmoticon,
+    playWinkAnimation,
     sendMessage,
     sendFile,
     setListeningTrack: (trackStr) => {
