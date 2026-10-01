@@ -37,7 +37,6 @@ window.YahooBrowser = (function () {
   function closeTab(tabId, event) {
     if (event) event.stopPropagation();
     if (tabs.length <= 1) {
-      // Don't close the last tab, reset to home
       navigate('about:yahoo');
       return;
     }
@@ -45,7 +44,6 @@ window.YahooBrowser = (function () {
     const idx = tabs.findIndex(t => t.id === tabId);
     if (idx === -1) return;
 
-    // Remove viewport DOM
     const vp = document.getElementById('vp_' + tabId);
     if (vp) vp.remove();
 
@@ -64,7 +62,6 @@ window.YahooBrowser = (function () {
     const tab = tabs.find(t => t.id === tabId);
     if (!tab) return;
 
-    // Hide all viewports, show active
     document.querySelectorAll('.browser-tab-viewport').forEach(el => el.style.display = 'none');
     const curVp = document.getElementById('vp_' + tabId);
     if (curVp) curVp.style.display = 'block';
@@ -94,7 +91,7 @@ window.YahooBrowser = (function () {
       strip.appendChild(tabEl);
     });
 
-    // New Tab Button
+    // New Tab (+) Button
     const newBtn = document.createElement('button');
     newBtn.className = 'browser-tab-add';
     newBtn.title = 'New Tab';
@@ -145,7 +142,7 @@ window.YahooBrowser = (function () {
     let url = (rawInput || '').trim();
     if (!url) return;
 
-    // Detect YouTube search or link
+    // Detect YouTube link or query
     if (url.includes('youtube.com/watch') || url.includes('youtu.be/')) {
       const videoId = extractYouTubeId(url);
       if (videoId) {
@@ -200,7 +197,7 @@ window.YahooBrowser = (function () {
       return;
     }
 
-    // 2. Dedicated Interactive YouTube Engine (bypasses iframe restrictions)
+    // 2. Dedicated Interactive YouTube Engine
     if (url === 'about:youtube' || url.startsWith('about:youtube')) {
       tab.title = 'YouTube Video Portal';
       renderYouTubePortal(iframe);
@@ -370,7 +367,6 @@ window.YahooBrowser = (function () {
     iframe.srcdoc = portalHtml;
   }
 
-  // Interactive Live YouTube Video Engine for Webamp/XP
   function renderYouTubePortal(iframe) {
     const ytHtml = `
       <!DOCTYPE html>
@@ -443,7 +439,6 @@ window.YahooBrowser = (function () {
             if (match && match[2].length === 11) {
               playVid(match[2]);
             } else {
-              // Open framed YouTube Search
               parent.YahooBrowser.navigate("https://www.google.com/search?igu=1&q=site:youtube.com+" + encodeURIComponent(q));
             }
           }
